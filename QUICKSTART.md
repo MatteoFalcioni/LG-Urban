@@ -25,7 +25,7 @@ Code execution → File in /session/artifacts/
 
 **Current Phase:** Phase 1 - Repository Setup
 
-### Today's Tasks (Phase 1)
+### ✅ Today's Tasks (Phase 1) 
 
 1. **Create directory structure:**
 ```bash
@@ -69,6 +69,8 @@ git init
 git add .
 git commit -m "Initial commit: fused LG-App-Template + LangGraph-Sandbox"
 ```
+
+✅ DONE 
 
 ### Next Sessions
 

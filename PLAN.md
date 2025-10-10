@@ -33,15 +33,15 @@
 ## Phase 1: Repository Setup & File Migration
 
 ### 1.1 Initialize Repository Structure
-- [ ] Verify current directory: `~/LG-Urban/`
-- [ ] Create directory structure:
+- [✅] Verify current directory: `~/LG-Urban/`
+- [✅] Create directory structure:
 ```bash
 mkdir -p backend/{app,db/alembic,graph,sandbox,artifacts,dataset_manager,tool_factory}
 mkdir -p frontend infra
 ```
 
 ### 1.2 Copy Core Files from LG-App-Template
-- [ ] Copy backend structure:
+- [✅] Copy backend structure:
 ```bash
 cp -r ../LG-App-Template/backend/app ./backend/
 cp -r ../LG-App-Template/backend/db ./backend/
@@ -50,12 +50,12 @@ cp ../LG-App-Template/backend/main.py ./backend/
 cp -r ../LG-App-Template/backend/graph ./backend/
 ```
 
-- [ ] Copy frontend:
+- [✅] Copy frontend:
 ```bash
 cp -r ../LG-App-Template/frontend/* ./frontend/
 ```
 
-- [ ] Copy infrastructure:
+- [✅] Copy infrastructure:
 ```bash
 cp -r ../LG-App-Template/infra/* ./infra/
 cp ../LG-App-Template/requirements.txt ./
@@ -63,53 +63,53 @@ cp ../LG-App-Template/alembic.ini ./
 ```
 
 ### 1.3 Copy Sandbox Components from LangGraph-Sandbox
-- [ ] Copy sandbox core:
+- [✅] Copy sandbox core:
 ```bash
 cp -r ../LangGraph-Sandbox/langgraph_sandbox/sandbox/* ./backend/sandbox/
 ```
 
-- [ ] Copy artifacts module (will be refactored):
+- [✅] Copy artifacts module (will be refactored):
 ```bash
 cp -r ../LangGraph-Sandbox/langgraph_sandbox/artifacts/* ./backend/artifacts/
 ```
 
-- [ ] Copy tool factory:
+- [✅] Copy tool factory:
 ```bash
 cp -r ../LangGraph-Sandbox/langgraph_sandbox/tool_factory/* ./backend/tool_factory/
 ```
 
-- [ ] Copy dataset manager:
+- [✅] Copy dataset manager:
 ```bash
 cp -r ../LangGraph-Sandbox/langgraph_sandbox/dataset_manager/* ./backend/dataset_manager/
 ```
 
-- [ ] Copy config and Docker files:
+- [✅] Copy config and Docker files:
 ```bash
 cp ../LangGraph-Sandbox/langgraph_sandbox/config.py ./backend/sandbox_config.py
 cp ../LangGraph-Sandbox/Dockerfile.sandbox ./
 ```
 
 ### 1.4 Copy Additional Files
-- [ ] Create/copy environment templates:
+- [✅] Create/copy environment templates:
 ```bash
 cp ../LG-App-Template/backend/env.template ./backend/env.template
 cp ../LangGraph-Sandbox/sandbox.env.example ./sandbox.env.example
 ```
 
-- [ ] Copy documentation:
+- [✅] Copy documentation:
 ```bash
 cp ../LG-App-Template/README.md ./README-template.md
 cp ../LangGraph-Sandbox/README.md ./README-sandbox.md
 ```
 
 ### 1.5 Initialize Git
-- [ ] Initialize fresh git repository:
+- [✅] Initialize fresh git repository:
 ```bash
 git init
 echo "# LG-Urban - LangGraph Chat with Sandboxed Code Execution" > README.md
 ```
 
-- [ ] Create `.gitignore`:
+- [✅] Create `.gitignore`:
 ```gitignore
 # Python
 __pycache__/
@@ -159,7 +159,7 @@ artifact_logs/
 docker-compose.override.yml
 ```
 
-- [ ] Initial commit:
+- [✅] Initial commit:
 ```bash
 git add .
 git commit -m "Initial commit: fused LG-App-Template + LangGraph-Sandbox"
