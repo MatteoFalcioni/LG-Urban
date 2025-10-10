@@ -1,0 +1,66 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+.venv
+pip-log.txt
+pip-delete-this-directory.txt
+.pytest_cache/
+*.egg-info/
+dist/
+build/
+
+# Database
+*.db
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
+*.db-journal
+
+# Environment
+.env
+*.env
+!*.env.example
+!env.template
+!sandbox.env.example
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+
+# Node
+node_modules/
+dist/
+.parcel-cache/
+
+# Artifacts & Blobstore
+blobstore/
+sessions/
+exports/
+artifact_logs/
+
+# Docker
+docker-compose.override.yml
+
+# Logs
+*.log
+logs/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Temporary files
+*.tmp
+*.temp
+tmp/
+temp/
+
