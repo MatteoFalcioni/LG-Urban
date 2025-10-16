@@ -77,6 +77,8 @@ services:
       BLOBSTORE_DIR: /app/blobstore
       SANDBOX_NETWORK: langgraph-network
       MAX_ARTIFACT_SIZE_MB: 50
+      ARTIFACTS_SECRET: ${ARTIFACTS_SECRET:-fixed-secret-key-for-development}
+      ARTIFACTS_TOKEN_TTL_SECONDS: ${ARTIFACTS_TOKEN_TTL_SECONDS:-86400}
       CORS_ORIGINS: http://localhost,http://localhost:80
     ports:
       - "8000:8000"

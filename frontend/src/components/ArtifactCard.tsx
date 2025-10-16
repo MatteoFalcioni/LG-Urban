@@ -34,6 +34,7 @@ function getIconForMime(mime: string) {
 export function ArtifactCard({ artifact }: ArtifactCardProps) {
   const { name, mime, size, url } = artifact;
   const isImage = mime.startsWith('image/');
+  const isHtml = mime === 'text/html';
 
   return (
     <div className="space-y-2">
@@ -44,6 +45,18 @@ export function ArtifactCard({ artifact }: ArtifactCardProps) {
             src={url} 
             alt={name}
             className="w-full h-auto max-h-96 object-contain bg-white dark:bg-slate-900"
+          />
+        </div>
+      )}
+      
+      {/* HTML preview for HTML files */}
+      {isHtml && (
+        <div className="rounded-lg overflow-hidden border border-gray-200 dark:border-slate-600">
+          <iframe
+            src={url}
+            className="w-full h-96 bg-white dark:bg-slate-900"
+            title={name}
+            sandbox="allow-scripts allow-same-origin"
           />
         </div>
       )}

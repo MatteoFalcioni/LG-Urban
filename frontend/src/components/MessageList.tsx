@@ -17,6 +17,7 @@ export function MessageList() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const streamingDraft = useChatStore((state) => state.streamingDraft);
   const toolDrafts = useChatStore((state) => state.toolDrafts);
+  const artifactBubbles = useChatStore((state) => state.artifactBubbles);
 
   // Fetch messages when thread changes
   useEffect(() => {
@@ -75,25 +76,35 @@ export function MessageList() {
         </div>
       )}
 
-      {/* Inline tool execution drafts */}
+      {/* Inline tool execution drafts (no artifacts here) */}
       {toolDrafts
         .filter((t) => t.threadId === currentThreadId)
         .map((t, idx) => (
           <div key={`tool-draft-${idx}-${t.name}`} className="flex gap-3 items-start">
             <div className="w-8 h-8 rounded-full bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center flex-shrink-0">
-              <Wrench size={16} className={`text-purple-600 dark:text-purple-400 ${!t.artifacts ? 'animate-spin' : ''}`} />
+              <Wrench size={16} className="text-purple-600 dark:text-purple-400 animate-spin" />
             </div>
             <div className="flex-1 bg-purple-50 dark:bg-purple-900/10 border border-purple-200 dark:border-purple-800 rounded-lg p-3">
               <div className="text-xs font-semibold text-purple-700 dark:text-purple-300 mb-1">
-                {t.name} {t.artifacts ? '✓' : ''}
+                {t.name}
               </div>
               {t.input && (
                 <div className="text-xs text-gray-700 dark:text-slate-300">{formatParams(t.input)}</div>
               )}
-              {/* Show artifacts if available */}
-              {t.artifacts && t.artifacts.length > 0 && (
-                <ArtifactGrid artifacts={t.artifacts} />
-              )}
+            </div>
+          </div>
+        ))}
+      
+      {/* Artifact bubbles (separate from tool execution) */}
+      {artifactBubbles
+        .filter((a) => a.threadId === currentThreadId)
+        .map((a, idx) => (
+          <div key={`artifact-${idx}-${a.toolName}`} className="flex gap-3 items-start">
+            <div className="w-8 h-8 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center flex-shrink-0">
+              <Wrench size={16} className="text-green-600 dark:text-green-400" />
+            </div>
+            <div className="flex-1 max-w-2xl">
+              <ArtifactGrid artifacts={a.artifacts} />
             </div>
           </div>
         ))}

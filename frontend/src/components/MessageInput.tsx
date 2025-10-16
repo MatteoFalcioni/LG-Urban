@@ -27,8 +27,8 @@ export function MessageInput() {
   const [input, setInput] = useState('');
   const streamingRef = useRef(''); // Accumulate streaming tokens (mirror to avoid stale closure on onDone)
   const addToolDraft = useChatStore((state) => state.addToolDraft);
-  const updateToolDraft = useChatStore((state) => state.updateToolDraft);
   const removeToolDraft = useChatStore((state) => state.removeToolDraft);
+  const addArtifactBubble = useChatStore((state) => state.addArtifactBubble);
   
   // SSE hook with handlers for streaming events
   const { sendMessage, isStreaming } = useSSE({
@@ -44,13 +44,12 @@ export function MessageInput() {
     onToolEnd: (name, output, artifacts) => {
       console.log(`Tool finished: ${name}`, output, artifacts);
       if (currentThreadId) {
-        // If artifacts were generated, keep them visible permanently
+        // Always remove tool draft when complete
+        removeToolDraft(currentThreadId, name);
+        
+        // If artifacts were generated, add them as a separate bubble
         if (artifacts && artifacts.length > 0) {
-          updateToolDraft(currentThreadId, name, { artifacts });
-          // Don't remove - artifacts stay visible
-        } else {
-          // No artifacts, remove the tool indicator
-          removeToolDraft(currentThreadId, name);
+          addArtifactBubble(currentThreadId, name, artifacts);
         }
       }
     },

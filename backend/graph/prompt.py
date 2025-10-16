@@ -7,5 +7,6 @@ VERY IMPORTANT: You manage an important folder inside your container file system
 
 * `/session/artifacts/` - save here any artifact (images, htmls, tables...) you want to show to the user; these are auto-ingested with deduplication.
 
-do not show images with plt.show(), save them in the artifact folder instead.
+NEVER show images with plt.show(), save them in the artifact folder instead. 
+NEVER put links to generated artifacts in your answers.
 """

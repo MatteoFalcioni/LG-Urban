@@ -33,10 +33,13 @@ interface ChatStore {
   clearStreamingDraft: () => void;
 
   // Live tool execution drafts shown inline while tools run
-  toolDrafts: { threadId: string; name: string; input?: any; artifacts?: Artifact[] }[];
+  toolDrafts: { threadId: string; name: string; input?: any }[];
   addToolDraft: (threadId: string, name: string, input?: any) => void;
-  updateToolDraft: (threadId: string, name: string, updates: { artifacts?: Artifact[] }) => void;
   removeToolDraft: (threadId: string, name: string) => void;
+  
+  // Artifact bubbles (separate from tool drafts, persistent)
+  artifactBubbles: { threadId: string; toolName: string; artifacts: Artifact[] }[];
+  addArtifactBubble: (threadId: string, toolName: string, artifacts: Artifact[]) => void;
 
   // UI state
   isSidebarOpen: boolean;
@@ -84,7 +87,7 @@ export const useChatStore = create<ChatStore>((set) => ({
     })),
 
   currentThreadId: null,
-  setCurrentThreadId: (id) => set({ currentThreadId: id, messages: [] }),
+  setCurrentThreadId: (id) => set({ currentThreadId: id, messages: [], artifactBubbles: [] }),
 
   messages: [],
   setMessages: (messages) => set({ messages }),
@@ -101,14 +104,12 @@ export const useChatStore = create<ChatStore>((set) => ({
   toolDrafts: [],
   addToolDraft: (threadId, name, input) =>
     set((state) => ({ toolDrafts: [...state.toolDrafts, { threadId, name, input }] })),
-  updateToolDraft: (threadId, name, updates) =>
-    set((state) => ({
-      toolDrafts: state.toolDrafts.map((t) =>
-        t.threadId === threadId && t.name === name ? { ...t, ...updates } : t
-      ),
-    })),
   removeToolDraft: (threadId, name) =>
     set((state) => ({ toolDrafts: state.toolDrafts.filter((t) => !(t.threadId === threadId && t.name === name)) })),
+  
+  artifactBubbles: [],
+  addArtifactBubble: (threadId, toolName, artifacts) =>
+    set((state) => ({ artifactBubbles: [...state.artifactBubbles, { threadId, toolName, artifacts }] })),
 
   isSidebarOpen: true,
   toggleSidebar: () => set((state) => ({ isSidebarOpen: !state.isSidebarOpen })),
