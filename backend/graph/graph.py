@@ -10,6 +10,14 @@ import os
 
 from backend.graph.prompt import PROMPT
 from backend.graph.tools import internet_search, make_code_sandbox
+from backend.graph.api_tools import (
+    list_catalog_tool,
+    preview_dataset_tool,
+    get_dataset_description_tool,
+    get_dataset_fields_tool,
+    is_geo_dataset_tool,
+    get_dataset_time_info_tool,
+)
 from backend.graph.state import MyState
 from backend.config import CONTEXT_WINDOW
 
@@ -78,7 +86,16 @@ def make_graph(model_name: str | None = None, temperature: float | None = None, 
     # main agent
     agent = create_react_agent(
         model=llm,
-        tools=[internet_search, code_sandbox],
+        tools=[
+            internet_search,
+            code_sandbox,
+            list_catalog_tool,
+            preview_dataset_tool,
+            get_dataset_description_tool,
+            get_dataset_fields_tool,
+            is_geo_dataset_tool,
+            get_dataset_time_info_tool,
+        ],
         prompt=system_message,  # System prompt for the agent
         name="agent",
         state_schema=MyState,
