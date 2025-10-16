@@ -85,8 +85,3 @@ def make_code_sandbox(session_key_fn=None):
             "Always use print() to show results to the user."
         ),
     )
-
-# ---------- Dataset Tools ----------
-# Note: Dataset tools (select_dataset, export_datasets, list_datasets) are available
-# in make_tools.py but require dataset management infrastructure to be set up.
-# They can be added when needed by importing from tool_factory.make_tools.
