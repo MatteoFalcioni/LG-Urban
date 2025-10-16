@@ -18,6 +18,16 @@ from backend.graph.api_tools import (
     is_geo_dataset_tool,
     get_dataset_time_info_tool,
 )
+from backend.graph.dataset_tools import (
+    select_dataset_tool,
+    export_datasets_tool,
+    list_datasets_tool,
+)
+from backend.graph.sit_tools import (
+    folium_ortho,
+    compare_ortofoto,
+    view_3d_model,
+)
 from backend.graph.state import MyState
 from backend.config import CONTEXT_WINDOW
 
@@ -87,14 +97,24 @@ def make_graph(model_name: str | None = None, temperature: float | None = None, 
     agent = create_react_agent(
         model=llm,
         tools=[
+            # Core tools
             internet_search,
             code_sandbox,
+            # Bologna OpenData API tools
             list_catalog_tool,
             preview_dataset_tool,
             get_dataset_description_tool,
             get_dataset_fields_tool,
             is_geo_dataset_tool,
             get_dataset_time_info_tool,
+            # Dataset management tools
+            select_dataset_tool,
+            list_datasets_tool,
+            export_datasets_tool,
+            # SIT (Geographic Information System) tools
+            folium_ortho,
+            compare_ortofoto,
+            view_3d_model,
         ],
         prompt=system_message,  # System prompt for the agent
         name="agent",

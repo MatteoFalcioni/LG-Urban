@@ -146,7 +146,7 @@ async def ingest_files(
     
     return descriptors
 
-
+from backend.db.models import Artifact
 async def _upsert_artifact(
     session: AsyncSession,
     thread_id: uuid.UUID,
@@ -169,7 +169,6 @@ async def _upsert_artifact(
     For now: Create a new artifact record even if blob exists (allows tracking 
     multiple references to the same file in different contexts).
     """
-    from backend.db.models import Artifact
     
     # Copy file to blobstore (idempotent - skips if exists)
     copy_to_blobstore(src_file, sha256)

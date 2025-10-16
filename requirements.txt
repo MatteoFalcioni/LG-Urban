@@ -11,6 +11,7 @@ pytest-asyncio
 langgraph
 langchain-openai
 langgraph-checkpoint-sqlite
+langchain-google-community
 docker
 tavily-python
 
