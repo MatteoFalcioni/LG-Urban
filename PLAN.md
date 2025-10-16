@@ -484,6 +484,12 @@ CORS_ORIGINS=http://localhost:5173
 ```
 
 ---
+## Phase 6+ : INCLUDE OPENDATA API 
+- [] include opendata api client class and tools
+- [] integrate them with current system
+- [] then link other tools in make_tools
+
+---
 
 ## Phase 7: Testing & Validation
 
