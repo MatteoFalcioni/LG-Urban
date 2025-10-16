@@ -1,0 +1,93 @@
+services:
+  # PostgreSQL database
+  db:
+    image: postgres:16
+    container_name: lg_urban_db
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-chat}
+    ports:
+      - "5432:5432"
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - langgraph-network
+
+  # Backend API
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    container_name: lg_urban_backend
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql+asyncpg://postgres:postgres@db:5432/chat
+      ALEMBIC_DATABASE_URL: postgresql+psycopg2://postgres:postgres@db:5432/chat
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      TAVILY_API_KEY: ${TAVILY_API_KEY:-}
+      DEFAULT_MODEL: ${DEFAULT_MODEL:-gpt-4o}
+      DEFAULT_TEMPERATURE: ${DEFAULT_TEMPERATURE:-0.7}
+      CONTEXT_WINDOW: ${CONTEXT_WINDOW:-30000}
+      SANDBOX_IMAGE: sandbox:latest
+      SESSION_STORAGE: TMPFS
+      TMPFS_SIZE_MB: 1024
+      DATASET_ACCESS: NONE
+      BLOBSTORE_DIR: /app/blobstore
+      SANDBOX_NETWORK: langgraph-network
+      MAX_ARTIFACT_SIZE_MB: 50
+      CORS_ORIGINS: http://localhost,http://localhost:80
+    ports:
+      - "8000:8000"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock  # Allow backend to spawn sandbox containers
+      - blobstore:/app/blobstore
+      - sessions:/app/sessions
+    networks:
+      - langgraph-network
+    restart: unless-stopped
+
+  # Frontend web app
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+    container_name: lg_urban_frontend
+    depends_on:
+      - backend
+    ports:
+      - "80:80"
+    networks:
+      - langgraph-network
+    restart: unless-stopped
+
+  # Database admin UI (optional, can be removed in production)
+  adminer:
+    image: adminer:4
+    container_name: lg_urban_adminer
+    depends_on:
+      - db
+    ports:
+      - "8080:8080"
+    environment:
+      ADMINER_DEFAULT_SERVER: db
+    networks:
+      - langgraph-network
+
+volumes:
+  pg_data:
+  blobstore:
+  sessions:
+
+networks:
+  langgraph-network:
+    name: langgraph-network
+    driver: bridge
+

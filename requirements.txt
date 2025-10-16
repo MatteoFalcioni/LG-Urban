@@ -10,3 +10,5 @@ pytest
 pytest-asyncio
 langgraph
 langchain-openai
+docker
+tavily-python
