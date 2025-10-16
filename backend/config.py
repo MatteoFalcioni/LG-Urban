@@ -24,6 +24,11 @@ TMPFS_SIZE_MB = int(os.getenv("TMPFS_SIZE_MB", "1024"))
 # Dataset access mode: NONE, LOCAL_RO, API, HYBRID
 DATASET_ACCESS = os.getenv("DATASET_ACCESS", "NONE")
 
+# Hybrid mode local datasets path (mounted as /heavy_data in sandbox)
+HYBRID_LOCAL_PATH = os.getenv("HYBRID_LOCAL_PATH", None)
+if HYBRID_LOCAL_PATH:
+    HYBRID_LOCAL_PATH = Path(HYBRID_LOCAL_PATH)
+
 # Session directory (for BIND mode and logs)
 SESSIONS_ROOT = Path(os.getenv("SESSIONS_ROOT", "./sessions"))
 

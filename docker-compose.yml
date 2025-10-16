@@ -74,7 +74,8 @@ services:
       SANDBOX_IMAGE: sandbox:latest
       SESSION_STORAGE: TMPFS
       TMPFS_SIZE_MB: 1024
-      DATASET_ACCESS: NONE
+      DATASET_ACCESS: ${DATASET_ACCESS:-NONE}
+      HYBRID_LOCAL_PATH: /heavy_llm_data
       BLOBSTORE_DIR: /app/blobstore
       SANDBOX_NETWORK: langgraph-network
       MAX_ARTIFACT_SIZE_MB: 50
@@ -87,6 +88,7 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock  # Allow backend to spawn sandbox containers
       - blobstore:/app/blobstore
       - sessions:/app/sessions
+      - ./heavy_llm_data:/heavy_llm_data:ro  # Heavy datasets for HYBRID mode
     deploy:
       resources:
         limits:

@@ -10,6 +10,7 @@ from backend.config import (
     DATASET_ACCESS,
     TMPFS_SIZE_MB,
     SANDBOX_NETWORK,
+    HYBRID_LOCAL_PATH,
 )
 
 
@@ -47,6 +48,7 @@ def get_session_manager() -> SessionManager:
             dataset_access=DATASET_ACCESS,
             tmpfs_size=tmpfs_size,
             compose_network=SANDBOX_NETWORK,
+            hybrid_local_path=HYBRID_LOCAL_PATH,  # Required for HYBRID mode
         )
     return _session_manager
 
