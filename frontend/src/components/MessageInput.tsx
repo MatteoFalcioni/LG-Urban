@@ -44,13 +44,12 @@ export function MessageInput() {
     onToolEnd: (name, output, artifacts) => {
       console.log(`Tool finished: ${name}`, output, artifacts);
       if (currentThreadId) {
-        // If artifacts were generated, update the draft to show them
+        // If artifacts were generated, keep them visible permanently
         if (artifacts && artifacts.length > 0) {
           updateToolDraft(currentThreadId, name, { artifacts });
-          // Keep the draft visible for a moment to show artifacts, then remove
-          setTimeout(() => removeToolDraft(currentThreadId, name), 10000);
+          // Don't remove - artifacts stay visible
         } else {
-          // No artifacts, remove immediately
+          // No artifacts, remove the tool indicator
           removeToolDraft(currentThreadId, name);
         }
       }

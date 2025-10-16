@@ -34,5 +34,9 @@ BLOBSTORE_DIR = Path(os.getenv("BLOBSTORE_DIR", "./blobstore"))
 SANDBOX_NETWORK = os.getenv("SANDBOX_NETWORK", "langgraph-network")
 
 # Maximum artifact size in MB
-MAX_ARTIFACT_SIZE_MB = int(os.getenv("MAX_ARTIFACT_SIZE_MB", "50")) 
+MAX_ARTIFACT_SIZE_MB = int(os.getenv("MAX_ARTIFACT_SIZE_MB", "50"))
+
+# Artifact token configuration
+ARTIFACTS_SECRET = os.getenv("ARTIFACTS_SECRET", "default-secret-change-in-production")
+ARTIFACTS_TOKEN_TTL_SECONDS = int(os.getenv("ARTIFACTS_TOKEN_TTL_SECONDS", "86400"))  # 24 hours default 
 

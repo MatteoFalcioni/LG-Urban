@@ -1,4 +1,20 @@
 services:
+  # Cleanup old sandbox containers from previous runs
+  cleanup:
+    image: docker:latest
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    command: >
+      sh -c "
+        echo '🧹 Cleaning up old sandbox containers...';
+        docker stop $$(docker ps -q --filter 'name=sbox-') 2>/dev/null || true;
+        docker rm $$(docker ps -aq --filter 'name=sbox-') 2>/dev/null || true;
+        echo '✅ Cleanup complete';
+        exit 0
+      "
+    networks:
+      - langgraph-network
+
   # PostgreSQL database
   db:
     image: postgres:16
@@ -19,6 +35,18 @@ services:
     networks:
       - langgraph-network
 
+  # Build sandbox image (used by backend to spawn containers)
+  sandbox:
+    build:
+      context: .
+      dockerfile: Dockerfile.sandbox
+    image: sandbox:latest
+    networks:
+      - langgraph-network
+    # This service just builds the image and exits
+    profiles:
+      - build
+
   # Backend API
   backend:
     build:
@@ -26,6 +54,8 @@ services:
       dockerfile: Dockerfile.backend
     container_name: lg_urban_backend
     depends_on:
+      cleanup:
+        condition: service_completed_successfully
       db:
         condition: service_healthy
     environment:
@@ -36,6 +66,10 @@ services:
       DEFAULT_MODEL: ${DEFAULT_MODEL:-gpt-4o}
       DEFAULT_TEMPERATURE: ${DEFAULT_TEMPERATURE:-0.7}
       CONTEXT_WINDOW: ${CONTEXT_WINDOW:-30000}
+      LANGSMITH_TRACING: ${LANGSMITH_TRACING}
+      LANGSMITH_ENDPOINT: ${LANGSMITH_ENDPOINT}
+      LANGSMITH_API_KEY: ${LANGSMITH_API_KEY}
+      LANGSMITH_PROJECT: ${LANGSMITH_PROJECT}
       SANDBOX_IMAGE: sandbox:latest
       SESSION_STORAGE: TMPFS
       TMPFS_SIZE_MB: 1024
@@ -50,6 +84,14 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock  # Allow backend to spawn sandbox containers
       - blobstore:/app/blobstore
       - sessions:/app/sessions
+    deploy:
+      resources:
+        limits:
+          memory: 4G
+        reservations:
+          memory: 2G
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     networks:
       - langgraph-network
     restart: unless-stopped
@@ -89,5 +131,5 @@ volumes:
 networks:
   langgraph-network:
     name: langgraph-network
-    driver: bridge
+    external: true
 

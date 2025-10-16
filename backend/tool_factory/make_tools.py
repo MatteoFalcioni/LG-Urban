@@ -58,13 +58,6 @@ def make_code_sandbox_tool(
         tool_call_id: Annotated[str, InjectedToolCallId],
     ) -> Command:
 
-        # Load configuration
-        try:
-            from ..config import Config
-        except ImportError:
-            from config import Config
-        cfg = Config.from_env()
-        
         sid = session_key_fn()
         session_manager.start(sid)
 
@@ -103,8 +96,11 @@ def make_code_sandbox_tool(
                 }
                 structured_artifacts.append(artifact_data)
 
-        # IF configs specify it (in_chat_url=True), also include the artifact information in the content for the agent
-        if cfg.in_chat_url:
+        # Don't include artifact URLs in chat content (keeps model focused on stdout/stderr)
+        # If you want to show URLs to the model, set this to True
+        in_chat_url = False
+        
+        if in_chat_url:
         # Create human-readable artifact summary for content
             artifact_summary = ""
             if artifacts:

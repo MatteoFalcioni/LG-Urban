@@ -525,13 +525,52 @@ async def post_message_stream(
                     elif event_type == "on_tool_end":   
                         raw_input = event.get("data", {}).get("input")
                         raw_output = event.get("data", {}).get("output")
-                        tool_output = to_jsonable(raw_output)
+                        
+                        # Extract artifacts and content from Command -> ToolMessage if present
+                        artifacts = None
+                        tool_content = None
+                        
+                        # Case 1: Output is a Command object (from code_sandbox tool)
+                        if hasattr(raw_output, "update") and isinstance(raw_output.update, dict):
+                            messages = raw_output.update.get("messages", [])
+                            if messages and len(messages) > 0:
+                                tool_msg = messages[0]
+                                # Extract artifacts
+                                if hasattr(tool_msg, "artifact") and tool_msg.artifact:
+                                    artifacts = tool_msg.artifact
+                                # Extract content for database persistence
+                                if hasattr(tool_msg, "content"):
+                                    tool_content = tool_msg.content
+                        # Case 2: Output is a ToolMessage directly
+                        elif hasattr(raw_output, "artifact"):
+                            artifacts = raw_output.artifact
+                            if hasattr(raw_output, "content"):
+                                tool_content = raw_output.content
+                        
+                        # For database: store the tool content as dict (not the whole Command object)
+                        if tool_content:
+                            # If content is a string, wrap it in a dict
+                            tool_output_for_db = {"content": tool_content} if isinstance(tool_content, str) else to_jsonable(tool_content)
+                        else:
+                            # Fallback to jsonable representation
+                            tool_output_for_db = to_jsonable(raw_output)
+                        
                         tool_calls.append({
                             "name": event_name,
                             "input": to_jsonable(raw_input),
-                            "output": tool_output,
+                            "output": tool_output_for_db,
                         })
-                        yield f"data: {json.dumps({'type': 'tool_end', 'name': event_name, 'output': tool_output})}\n\n"
+                        
+                        # Include artifacts in SSE event for frontend
+                        event_data = {
+                            'type': 'tool_end',
+                            'name': event_name,
+                            'output': tool_output_for_db
+                        }
+                        if artifacts:
+                            event_data['artifacts'] = artifacts
+                        
+                        yield f"data: {json.dumps(event_data)}\n\n"
                     
                     # Capture final assistant message (but not from summarizer or its sub-calls)
                     elif event_type == "on_chat_model_end":

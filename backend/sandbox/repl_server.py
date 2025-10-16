@@ -1,8 +1,11 @@
 # repl_server.py
-import io, traceback, asyncio
+import io, traceback, asyncio, os
 from contextlib import redirect_stdout
 from fastapi import FastAPI
 from pydantic import BaseModel
+
+# Configure matplotlib for headless mode (must be before importing pyplot)
+os.environ['MPLBACKEND'] = 'Agg'
 
 # FastAPI 'bridge' between the host and the Python REPL in the container's memory
 

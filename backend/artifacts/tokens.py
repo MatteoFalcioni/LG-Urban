@@ -59,18 +59,17 @@ def verify_token(token: str) -> Dict[str, str | int]:
 def create_download_url(artifact_id: str) -> str:
     """
     Build a ready-to-click URL for the artifact:
-      {PUBLIC_BASE_URL}/artifacts/{id}?token=...
+      {PUBLIC_BASE_URL}/api/artifacts/{id}?token=...
     
-    Uses ARTIFACTS_PUBLIC_BASE_URL if set, otherwise defaults to localhost with dynamic port
+    Uses ARTIFACTS_PUBLIC_BASE_URL if set, otherwise uses relative path (for nginx proxy)
     """
     # Check for custom base URL first
     base = os.getenv("ARTIFACTS_PUBLIC_BASE_URL")
     if base:
         base = base.rstrip("/")
     else:
-        # Use dynamic port from environment, fallback to 8000
-        port = os.getenv("ARTIFACTS_SERVER_PORT", "8000")
-        base = f"http://localhost:{port}"
+        # Use relative path so it works through nginx proxy
+        base = ""
     
     token = create_token(artifact_id)
-    return f"{base}/artifacts/{artifact_id}?token={token}"
+    return f"{base}/api/artifacts/{artifact_id}?token={token}"
