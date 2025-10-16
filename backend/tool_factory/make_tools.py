@@ -374,28 +374,26 @@ def make_list_datasets_tool(
         tool_call_id: Annotated[str, InjectedToolCallId]
     ) -> Command:
         """List all datasets in the sandbox."""
-        try:
-            from ..config import Config, DatasetAccess
-        except ImportError:
-            from config import Config, DatasetAccess
+        import os
         
-        # Load configuration to determine dataset access mode
-        cfg = Config.from_env()
+        # Get dataset access mode from environment
+        dataset_access = os.getenv("DATASET_ACCESS", "NONE")
+        
         session_key = session_key_fn()
         
         # Start the session if not already started
         session_manager.start(session_key)
         
         # Determine the path to list based on dataset access mode
-        if cfg.dataset_access == DatasetAccess.API:
+        if dataset_access == "API":
             # API mode: list files in /data
             list_path = "/data"
             mode_description = "API mode (loaded datasets)"
-        elif cfg.dataset_access == DatasetAccess.LOCAL_RO:
+        elif dataset_access == "LOCAL_RO":
             # LOCAL_RO mode: list files in /data
             list_path = "/data"
             mode_description = "LOCAL_RO mode (statically mounted files)"
-        elif cfg.dataset_access == DatasetAccess.HYBRID:
+        elif dataset_access == "HYBRID":
             # HYBRID mode: list files in both /data (API) and /heavy_data (local)
             list_path = "/data"
             mode_description = "HYBRID mode (local + API datasets)"
@@ -413,7 +411,7 @@ def make_list_datasets_tool(
             )
         
         # Execute code to list files in the appropriate directory
-        if cfg.dataset_access == DatasetAccess.HYBRID:
+        if dataset_access == "HYBRID":
             # HYBRID mode: list both /data and /heavy_data
             list_code = f"""
 import os
@@ -502,7 +500,13 @@ print(json.dumps(result, indent=2))
 """
         
         # Execute the listing code
-        result = session_manager.exec(session_key, list_code, timeout=10)
+        result = await session_manager.exec(
+            session_key, 
+            list_code, 
+            timeout=10,
+            db_session=None,  # Not needed for listing
+            thread_id=None,
+        )
         
         if result.get("error"):
             content = f"Error listing datasets: {result['error']}"

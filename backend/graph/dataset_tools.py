@@ -22,6 +22,106 @@ from backend.opendata_api.helpers import get_dataset_bytes, is_dataset_too_heavy
 from backend.opendata_api.init_client import client
 
 
+def _tar_single_file_bytes(filename: str, data: bytes, mode: int = 0o644) -> bytes:
+    """Create a tar archive containing a single file."""
+    import tarfile
+    import io
+    
+    tar_stream = io.BytesIO()
+    with tarfile.open(fileobj=tar_stream, mode='w') as tar:
+        tarinfo = tarfile.TarInfo(name=filename)
+        tarinfo.size = len(data)
+        tarinfo.mode = mode
+        tar.addfile(tarinfo, io.BytesIO(data))
+    
+    tar_stream.seek(0)
+    return tar_stream.read()
+
+
+def put_bytes(container, container_path: str, data: bytes, *, mode: int = 0o644) -> None:
+    """
+    Write `data` to `container_path` inside the container by streaming a single-file
+    tar to Docker's put_archive. Overwrites any existing file.
+    
+    Falls back to base64 encoding if put_archive fails.
+    
+    Parameters:
+        container: Docker container object
+        container_path: Absolute path to the destination file in the container
+        data: File content (bytes)
+        mode: File mode for the created file (default 0o644)
+    """
+    from pathlib import Path
+    import base64
+    
+    if not container_path or container_path.endswith("/"):
+        raise ValueError("container_path must be a file path, not a directory")
+    
+    parent = str(Path(container_path).parent)
+    name_in_tar = str(Path(container_path).name)
+    
+    # Ensure parent directory exists
+    exec_result = container.exec_run(
+        ["python3", "-c", f"import os; os.makedirs('{parent}', exist_ok=True)"],
+        user="root"
+    )
+    if exec_result.exit_code != 0:
+        print(f"Warning: mkdir failed: {exec_result.output.decode()}")
+    
+    # Set permissions on parent
+    exec_result = container.exec_run(
+        ["chmod", "777", parent],
+        user="root"
+    )
+    
+    # Create tar with just the filename (no directory structure)
+    tar_bytes = _tar_single_file_bytes(name_in_tar, data, mode=mode)
+    
+    # Try put_archive first
+    try:
+        ok = container.put_archive(path=parent, data=tar_bytes)
+        
+        # Verify the file was actually written
+        exec_result = container.exec_run(["ls", "-la", container_path], user="root")
+        
+        if exec_result.exit_code == 0:
+            print(f"Successfully wrote {container_path} using put_archive")
+            print(f"File info: {exec_result.output.decode()}")
+            return
+        else:
+            print(f"File not found after put_archive, trying base64 fallback...")
+    except Exception as e:
+        print(f"put_archive exception: {e}, trying base64 fallback...")
+    
+    # Fallback to base64 method for small files
+    print(f"Using base64 fallback to write {container_path}")
+    data_b64 = base64.b64encode(data).decode('ascii')
+    
+    # Use Python to decode and write (more reliable than bash)
+    python_code = f"""
+import base64
+data = '{data_b64}'
+with open('{container_path}', 'wb') as f:
+    f.write(base64.b64decode(data))
+print(f"Wrote {{len(base64.b64decode(data))}} bytes to {container_path}")
+"""
+    
+    exec_result = container.exec_run(
+        ["python3", "-c", python_code],
+        user="root"
+    )
+    
+    if exec_result.exit_code != 0:
+        raise RuntimeError(f"Failed to write file using base64 method: {exec_result.output.decode()}")
+    
+    print(f"Base64 write output: {exec_result.output.decode()}")
+    
+    # Final verification
+    exec_result = container.exec_run(["ls", "-la", container_path], user="root")
+    if exec_result.exit_code != 0:
+        raise RuntimeError(f"File verification failed after base64 write: {exec_result.output.decode()}")
+
+
 def get_session_key():
     """Get session key from the conversation context."""
     try:
@@ -147,43 +247,10 @@ if exists:
     
     # Stage the dataset into the container at /data/{dataset_id}.parquet
     try:
-        # Ensure /data directory exists
-        exec_result = container.exec_run(
-            ["mkdir", "-p", "/data"],
-            user="root"
-        )
-        if exec_result.exit_code != 0:
-            print(f"Warning: mkdir /data failed: {exec_result.output.decode()}")
-        
-        # Write the parquet file to the container
         path_in_container = f"/data/{dataset_id}.parquet"
         
-        # Use docker SDK to copy bytes into container
-        import tarfile
-        import io
-        
-        # Create a tar archive in memory
-        tar_stream = io.BytesIO()
-        with tarfile.open(fileobj=tar_stream, mode='w') as tar:
-            tarinfo = tarfile.TarInfo(name=f"{dataset_id}.parquet")
-            tarinfo.size = len(parquet_bytes)
-            tar.addfile(tarinfo, io.BytesIO(parquet_bytes))
-        
-        tar_stream.seek(0)
-        
-        # Put the tar archive into the container
-        container.put_archive(path="/data", data=tar_stream)
-        
-        # Verify the file was created
-        exec_result = container.exec_run(
-            ["ls", "-lh", path_in_container],
-            user="root"
-        )
-        if exec_result.exit_code == 0:
-            print(f"Successfully staged {dataset_id} at {path_in_container}")
-            print(f"File info: {exec_result.output.decode()}")
-        else:
-            raise Exception(f"Failed to verify dataset file: {exec_result.output.decode()}")
+        # Use robust put_bytes function (handles tar extraction issues)
+        put_bytes(container, path_in_container, parquet_bytes)
         
         return {
             "id": dataset_id,
