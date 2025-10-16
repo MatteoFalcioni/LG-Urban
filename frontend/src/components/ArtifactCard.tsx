@@ -33,33 +33,48 @@ function getIconForMime(mime: string) {
 
 export function ArtifactCard({ artifact }: ArtifactCardProps) {
   const { name, mime, size, url } = artifact;
+  const isImage = mime.startsWith('image/');
 
   return (
-    <div className="flex items-center gap-3 p-3 bg-gray-50 dark:bg-slate-700/50 border border-gray-200 dark:border-slate-600 rounded-lg hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors">
-      {/* Icon */}
-      <div className="flex-shrink-0 w-10 h-10 bg-white dark:bg-slate-800 rounded-lg flex items-center justify-center border border-gray-200 dark:border-slate-600">
-        {getIconForMime(mime)}
-      </div>
+    <div className="space-y-2">
+      {/* Image preview for image files */}
+      {isImage && (
+        <div className="rounded-lg overflow-hidden border border-gray-200 dark:border-slate-600">
+          <img 
+            src={url} 
+            alt={name}
+            className="w-full h-auto max-h-96 object-contain bg-white dark:bg-slate-900"
+          />
+        </div>
+      )}
+      
+      {/* File info and download */}
+      <div className="flex items-center gap-3 p-3 bg-gray-50 dark:bg-slate-700/50 border border-gray-200 dark:border-slate-600 rounded-lg hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors">
+        {/* Icon */}
+        <div className="flex-shrink-0 w-10 h-10 bg-white dark:bg-slate-800 rounded-lg flex items-center justify-center border border-gray-200 dark:border-slate-600">
+          {getIconForMime(mime)}
+        </div>
 
-      {/* File info */}
-      <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
-          {name}
-        </p>
-        <p className="text-xs text-gray-500 dark:text-slate-400">
-          {mime} · {formatFileSize(size)}
-        </p>
-      </div>
+        {/* File info */}
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
+            {name}
+          </p>
+          <p className="text-xs text-gray-500 dark:text-slate-400">
+            {mime} · {formatFileSize(size)}
+          </p>
+        </div>
 
-      {/* Download button */}
-      <a
-        href={url}
-        download={name}
-        className="flex-shrink-0 p-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
-        title={`Download ${name}`}
-      >
-        <Download size={16} />
-      </a>
+        {/* Download button */}
+        <a
+          href={url}
+          download={name}
+          className="flex-shrink-0 p-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
+          title={`Download ${name}`}
+        >
+          <Download size={16} />
+        </a>
+      </div>
     </div>
   );
 }
