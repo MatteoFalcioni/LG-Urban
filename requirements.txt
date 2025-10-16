@@ -10,5 +10,6 @@ pytest
 pytest-asyncio
 langgraph
 langchain-openai
+langgraph-checkpoint-sqlite
 docker
 tavily-python
