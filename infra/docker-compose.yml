@@ -35,5 +35,5 @@ volumes:
 networks:
   default:
     name: langgraph-network
-    driver: bridge
+    external: true
 

@@ -427,7 +427,7 @@ export interface ToolMessage {
 ## Phase 6: Docker & Infrastructure
 
 ### 6.1 Update Docker Compose
-- [ ] Edit `infra/docker-compose.yml`:
+- [✅] Edit `infra/docker-compose.yml`:
   - Keep existing postgres + adminer services
   - Add network configuration for sandbox containers
   - Add volumes for blobstore
@@ -446,18 +446,19 @@ volumes:
 networks:
   default:
     name: langgraph-network
-    driver: bridge
+    external: true  # Use existing network
 ```
 
 ### 6.2 Build Sandbox Image
-- [ ] Ensure `Dockerfile.sandbox` is in root
-- [ ] Build image:
+- [✅] Ensure `Dockerfile.sandbox` is in root
+- [✅] Fixed path to repl_server.py (backend/sandbox/repl_server.py)
+- [✅] Build image:
 ```bash
 docker build -f Dockerfile.sandbox -t sandbox:latest .
 ```
 
 ### 6.3 Environment Configuration
-- [ ] Create `.env` file (based on env.template + sandbox.env.example):
+- [✅] Create `.env` file (based on env.template + sandbox.env.example):
 ```bash
 # Database
 DATABASE_URL=postgresql+asyncpg://postgres:postgres@localhost:5432/chat
