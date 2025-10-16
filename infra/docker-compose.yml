@@ -29,3 +29,11 @@ services:
 volumes:
   pg_data:
 
+# Network configuration for sandbox containers
+# The sandbox containers will be dynamically created by SessionManager
+# and will connect to this network to communicate with the backend
+networks:
+  default:
+    name: langgraph-network
+    driver: bridge
+
