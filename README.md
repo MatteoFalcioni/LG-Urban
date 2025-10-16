@@ -40,10 +40,10 @@ LG-Urban combines:
        │
    ┌───▼───┬────────────┐
    │       │            │
-┌──▼───┐ ┌▼─────────┐ ┌▼────────┐
-│ PG   │ │ LangGraph│ │Blobstore│
-│ DB   │ │Checkpoint│ │(Files)  │
-└──────┘ └──────────┘ └─────────┘
+┌──▼───┐  ┌▼─────────┐ ┌▼────────┐
+│ PG   │  │ LangGraph│ │Blobstore│
+│ DB   │  │Checkpoint│ │(Files)  │
+└──────┘  └──────────┘ └─────────┘
 ```
 
 ### Storage Strategy

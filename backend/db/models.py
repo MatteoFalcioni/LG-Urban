@@ -128,13 +128,24 @@ class Artifact(Base):
         UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
     )
     thread_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("threads.id", ondelete="CASCADE"), nullable=False, index=True
+        UUID(as_uuid=True), ForeignKey("threads.id", ondelete="CASCADE"), 
+        nullable=False, index=True
     )
-    # Artifact type (e.g., file, image, code, equation)
-    type: Mapped[str] = mapped_column(String(64), nullable=False)
-    uri: Mapped[Optional[str]] = mapped_column(String(2048), nullable=True)
-    blob: Mapped[Optional[bytes]] = mapped_column(nullable=True)
-    # Choose uri or blob depending on size; metadata for content-type, hashes, etc.
+    
+    # Deduplication via SHA-256 fingerprint
+    sha256: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    
+    # File metadata
+    filename: Mapped[str] = mapped_column(String(512), nullable=False)
+    mime: Mapped[str] = mapped_column(String(128), nullable=False)
+    size: Mapped[int] = mapped_column(nullable=False)
+    
+    # Session/run tracking for sandbox artifacts
+    session_id: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
+    run_id: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
+    tool_call_id: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
+    
+    # Arbitrary metadata (e.g., original container path, etc.)
     meta: Mapped[Optional[dict[str, Any]]] = mapped_column(JSONB, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=text("NOW()")
@@ -142,5 +153,10 @@ class Artifact(Base):
 
     # Relationships
     thread: Mapped[Thread] = relationship(back_populates="artifacts")
+    
+    __table_args__ = (
+        Index("ix_artifacts_thread_created", "thread_id", "created_at"),
+        Index("ix_artifacts_sha256", "sha256"),
+    )
 
 
