@@ -232,7 +232,7 @@ alembic upgrade head
 ## Phase 3: Refactor Artifact Storage
 
 ### 3.1 Create Unified Artifact Store Module
-- [ ] Create `backend/artifacts/storage.py`:
+- [✅] Create `backend/artifacts/storage.py`:
 ```python
 """
 Unified artifact storage using PostgreSQL metadata + filesystem blobstore.
@@ -273,24 +273,24 @@ def _sniff_mime(path: Path) -> str:
 ```
 
 ### 3.2 Refactor Artifact Ingestion
-- [ ] Create `backend/artifacts/ingest.py` (PostgreSQL version):
+- [✅] Create `backend/artifacts/ingest.py` (PostgreSQL version):
   - Replace SQLite connection with SQLAlchemy async session
   - Use `Artifact` model instead of raw SQL
   - Implement upsert logic for deduplication
   - Keep filesystem blobstore logic
 
-- [ ] Key functions to implement:
+- [✅] Key functions to implement:
   - `async def ingest_files(session, thread_id, files, session_id, run_id, tool_call_id) -> List[Artifact]`
   - `async def _upsert_artifact(session, sha256, ...) -> Artifact`
 
 ### 3.3 Update Artifact API
-- [ ] Refactor `backend/artifacts/api.py`:
+- [✅] Refactor `backend/artifacts/api.py`:
   - Replace SQLite queries with SQLAlchemy
   - Use PostgreSQL session dependency
   - Update token generation/verification if needed
   - Maintain backward compatibility with download URLs
 
-- [ ] Add artifact API router to `backend/main.py`:
+- [✅] Add artifact API router to `backend/main.py`:
 ```python
 from backend.artifacts.api import router as artifacts_router
 app.include_router(artifacts_router, prefix="/api")

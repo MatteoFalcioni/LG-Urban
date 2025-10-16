@@ -75,6 +75,9 @@ async def healthz() -> dict[str, str]:
     """
     return {"status": "ok"}
 
-# Placeholder: API routers (threads, messages) will be included under /api
+# API routers: threads, messages, artifacts
 from backend.app import api as api_router_module
+from backend.artifacts import api as artifacts_api
+
 app.include_router(api_router_module.router, prefix="/api")
+app.include_router(artifacts_api.router, prefix="/api")
