@@ -170,7 +170,7 @@ git commit -m "Initial commit: fused LG-App-Template + LangGraph-Sandbox"
 ## Phase 2: Database Schema Migration
 
 ### 2.1 Update Artifact Model
-- [ ] Edit `backend/db/models.py` - update `Artifact` class:
+- [✅] Edit `backend/db/models.py` - update `Artifact` class:
 ```python
 class Artifact(Base):
     __tablename__ = "artifacts"
@@ -212,7 +212,7 @@ class Artifact(Base):
 ```
 
 ### 2.2 Create Migration
-- [ ] Generate Alembic migration:
+- [✅] Generate Alembic migration:
 ```bash
 cd ~/LG-Urban
 # Ensure postgres is running via docker-compose
@@ -221,8 +221,8 @@ docker-compose -f infra/docker-compose.yml up -d db
 alembic revision --autogenerate -m "Add artifact deduplication with sha256"
 ```
 
-- [ ] Review and edit migration file in `backend/db/alembic/versions/`
-- [ ] Apply migration:
+- [✅] Review and edit migration file in `backend/db/alembic/versions/`
+- [✅] Apply migration:
 ```bash
 alembic upgrade head
 ```
