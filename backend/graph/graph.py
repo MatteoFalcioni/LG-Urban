@@ -9,7 +9,7 @@ from dotenv import load_dotenv
 import os
 
 from backend.graph.prompt import PROMPT
-from backend.graph.tools import internet_search
+from backend.graph.tools import internet_search, make_code_sandbox
 from backend.graph.state import MyState
 from backend.config import CONTEXT_WINDOW
 
@@ -72,10 +72,13 @@ def make_graph(model_name: str | None = None, temperature: float | None = None, 
         prompt_text += f"\n\n{system_prompt}"
     system_message = SystemMessage(content=prompt_text.strip())
 
+    # Create code sandbox tool (will be bound to thread_id later)
+    code_sandbox = make_code_sandbox()
+    
     # main agent
     agent = create_react_agent(
         model=llm,
-        tools=[internet_search],
+        tools=[internet_search, code_sandbox],
         prompt=system_message,  # System prompt for the agent
         name="agent",
         state_schema=MyState,

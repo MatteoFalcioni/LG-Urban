@@ -26,8 +26,8 @@ try:
     from .container_utils import cleanup_sandbox_containers
 except ImportError:
     # Fall back to absolute imports (when run directly)
-    from artifacts.ingest import ingest_files
-    from sandbox.container_utils import cleanup_sandbox_containers
+    from backend.artifacts.ingest import ingest_files
+    from backend.sandbox.container_utils import cleanup_sandbox_containers
 
 from enum import Enum
 
@@ -798,7 +798,14 @@ if session_artifacts.exists():
             # Don't fail the main execution if cleanup fails
             pass
 
-    def exec(self, session_key: str, code: str, timeout: int = 30) -> dict:
+    async def exec(
+        self,
+        session_key: str,
+        code: str,
+        timeout: int = 30,
+        db_session=None,
+        thread_id=None,
+    ) -> dict:
         """
         Execute Python code inside the session's container via the in-container REPL.
 
@@ -890,13 +897,23 @@ if session_artifacts.exists():
                 raise RuntimeError("Session directory is None in BIND mode. This should not happen.")
             host_files = [(info.session_dir / rel).resolve() for rel in new_rel_paths]
 
-        # Ingest
-        descriptors = ingest_files(
-            new_host_files=host_files,
-            session_id=session_key,
-            run_id=None,
-            tool_call_id=None,
-        )
+        # Ingest artifacts into PostgreSQL (if db_session and thread_id provided)
+        descriptors = []
+        if db_session is not None and thread_id is not None:
+            descriptors = await ingest_files(
+                session=db_session,
+                thread_id=thread_id,
+                new_host_files=host_files,
+                session_id=session_key,
+                run_id=None,
+                tool_call_id=None,
+            )
+        else:
+            # Fallback: just clean up files without ingesting
+            # This happens if called without database context
+            from backend.artifacts.storage import safe_delete_file
+            for f in host_files:
+                safe_delete_file(f)
         
         # Log artifact creation (BIND mode only)
         if self.session_storage == SessionStorage.BIND and descriptors:
@@ -971,7 +988,13 @@ if session_artifacts.exists():
         """
         return cleanup_sandbox_containers(verbose=verbose)
 
-    def export_file(self, session_key: str, container_path: str) -> dict:
+    async def export_file(
+        self,
+        session_key: str,
+        container_path: str,
+        db_session=None,
+        thread_id=None,
+    ) -> dict:
         """
         Export a file from the container's /data/ directory to the host.
         
@@ -1036,12 +1059,16 @@ if session_artifacts.exists():
             temp_copy.close()
             
             # Ingest the temporary copy into the artifact system to get proper download URL
-            descriptors = ingest_files(
-                new_host_files=[Path(temp_copy.name)],
-                session_id=session_key,
-                run_id=None,
-                tool_call_id=None,
-            )
+            descriptors = []
+            if db_session is not None and thread_id is not None:
+                descriptors = await ingest_files(
+                    session=db_session,
+                    thread_id=thread_id,
+                    new_host_files=[Path(temp_copy.name)],
+                    session_id=session_key,
+                    run_id=None,
+                    tool_call_id=None,
+                )
             
             # Clean up the temporary file (ingest_files already deleted it, but just to be safe)
             try:

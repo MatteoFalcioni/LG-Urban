@@ -16,7 +16,7 @@ try:
     from ..sandbox.session_manager import SessionManager
 except ImportError:
     # Fall back to absolute imports (when run directly)
-    from sandbox.session_manager import SessionManager
+    from backend.sandbox.session_manager import SessionManager
 
 
 def _default_get_session_key() -> str:
@@ -68,8 +68,20 @@ def make_code_sandbox_tool(
         sid = session_key_fn()
         session_manager.start(sid)
 
+        # Get database session and thread_id from context (set by the API layer)
+        try:
+            from backend.graph.context import get_db_session, get_thread_id
+            db_session = get_db_session()
+            thread_id = get_thread_id()
+        except ImportError:
+            # Fallback if context module not available
+            db_session = None
+            thread_id = None
+
         # Execute code - no dataset loading here anymore
-        result = session_manager.exec(sid, code, timeout=timeout_s)
+        result = await session_manager.exec(
+            sid, code, timeout=timeout_s, db_session=db_session, thread_id=thread_id
+        )
 
         payload = {
             "stdout": result.get("stdout", ""),

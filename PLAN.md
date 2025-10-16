@@ -301,15 +301,15 @@ app.include_router(artifacts_router, prefix="/api")
 ## Phase 4: Integrate Sandbox Tools
 
 ### 4.1 Fix Import Paths
-- [ ] Update all imports in `backend/sandbox/*`:
+- [✅] Update all imports in `backend/sandbox/*`:
   - Change `from ..config import Config` → `from backend.sandbox_config import Config`
   - Change `from ..artifacts import ...` → `from backend.artifacts import ...`
 
-- [ ] Update imports in `backend/tool_factory/*`:
+- [✅] Update imports in `backend/tool_factory/*`:
   - Adjust relative imports to absolute imports
 
 ### 4.2 Configure Sandbox Settings
-- [ ] Create `backend/config.py` (merge both configs):
+- [✅] Create `backend/config.py` (merge both configs):
   - Keep LG-App-Template config (DEFAULT_MODEL, etc.)
   - Add sandbox config (BLOBSTORE_DIR, SANDBOX_IMAGE, etc.)
   - Example:
@@ -327,7 +327,7 @@ SESSION_STORAGE = os.getenv("SESSION_STORAGE", "TMPFS")
 ```
 
 ### 4.3 Add Code Execution Tool
-- [ ] Update `backend/graph/tools.py`:
+- [✅] Update `backend/graph/tools.py`:
 ```python
 from backend.tool_factory.make_tools import make_code_sandbox_tool
 from backend.sandbox.session_manager import SessionManager
@@ -354,7 +354,7 @@ code_sandbox = make_code_sandbox_tool(
 )
 ```
 
-- [ ] Update `backend/graph/graph.py` - add `code_sandbox` to agent tools:
+- [✅] Update `backend/graph/graph.py` - add `code_sandbox` to agent tools:
 ```python
 agent = create_react_agent(
     model=llm,
@@ -366,9 +366,12 @@ agent = create_react_agent(
 ```
 
 ### 4.4 Pass Thread ID to Tools
-- [ ] Refactor tool factory to accept thread_id dynamically
-- [ ] Update `make_graph()` to inject thread_id into session_key_fn
-- [ ] Ensure artifacts are linked to correct thread_id in ingestion
+- [✅] Refactor tool factory to accept thread_id dynamically
+- [✅] Update `make_graph()` to inject thread_id into session_key_fn
+- [✅] Ensure artifacts are linked to correct thread_id in ingestion
+- [✅] Made SessionManager methods async (exec, export_file)
+- [✅] Created context module for passing db_session and thread_id
+- [✅] Updated API to set context variables before graph invocation
 
 ---
 

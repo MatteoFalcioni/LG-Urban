@@ -453,6 +453,8 @@ async def post_message_stream(
         from backend.graph.graph import make_graph
         from backend.main import _checkpointer_cm
         from backend.db.session import ASYNC_SESSION_MAKER
+        from backend.graph.context import set_db_session, set_thread_id
+        import uuid as uuid_module
         
         if not _checkpointer_cm:
             yield f"data: {json.dumps({'error': 'Checkpointer not initialized'})}\n\n"
@@ -474,6 +476,10 @@ async def post_message_stream(
         try:
             lock = get_thread_lock(str(thread_id))
             async with lock:
+                # Set context variables for tools to access database session and thread_id
+                set_db_session(session)
+                set_thread_id(uuid_module.UUID(str(thread_id)))
+                
                 # Extract text from content dict; LangChain messages expect string content
                 user_text = payload.content.get("text", str(payload.content))
                 state = {"messages": [{"role": "user", "content": user_text}]}
