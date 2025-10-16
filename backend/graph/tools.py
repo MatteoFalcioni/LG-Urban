@@ -37,11 +37,15 @@ def get_session_manager() -> SessionManager:
     """
     global _session_manager
     if _session_manager is None:
+        # Convert MB to string format (e.g., "1024" -> "1g")
+        tmpfs_mb = TMPFS_SIZE_MB
+        tmpfs_size = f"{tmpfs_mb}m" if tmpfs_mb < 1024 else f"{tmpfs_mb // 1024}g"
+        
         _session_manager = SessionManager(
             image=SANDBOX_IMAGE,
             session_storage=SESSION_STORAGE,
             dataset_access=DATASET_ACCESS,
-            tmpfs_size_mb=TMPFS_SIZE_MB,
+            tmpfs_size=tmpfs_size,
             compose_network=SANDBOX_NETWORK,
         )
     return _session_manager
