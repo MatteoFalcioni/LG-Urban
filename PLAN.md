@@ -378,23 +378,32 @@ agent = create_react_agent(
 ## Phase 5: Update Frontend
 
 ### 5.1 Add Artifact Display Components
-- [ ] Create `frontend/src/components/ArtifactCard.tsx`:
+- [✅] Create `frontend/src/components/ArtifactCard.tsx`:
   - Display artifact name, size, MIME type
   - Download button with artifact URL
   - Thumbnail for images
 
-- [ ] Update `frontend/src/components/MessageBubble.tsx`:
-  - Check for artifacts in tool messages
-  - Render artifact cards inline
+- [✅] Update `frontend/src/components/MessageList.tsx`:
+  - Check for artifacts in tool drafts
+  - Render artifact cards inline with tool executions
 
 ### 5.2 Handle Code Execution Events
-- [ ] Update `frontend/src/hooks/useSSE.ts`:
+- [✅] Update `frontend/src/hooks/useSSE.ts`:
   - Handle `tool_start` events (show "Executing code..." indicator)
   - Handle `tool_end` events (show execution results)
   - Parse artifact data from tool messages
 
+- [✅] Update `frontend/src/components/MessageInput.tsx`:
+  - Handle artifacts in tool_end events
+  - Update tool drafts with artifact data
+  - Display artifacts during streaming
+
+- [✅] Update `frontend/src/store/chatStore.ts`:
+  - Add artifact tracking to tool drafts
+  - Add updateToolDraft action
+
 ### 5.3 Update Types
-- [ ] Update `frontend/src/types/api.ts`:
+- [✅] Update `frontend/src/types/api.ts`:
 ```typescript
 export interface Artifact {
   id: string;

@@ -4,7 +4,7 @@
  */
 
 import { create } from 'zustand';
-import type { Thread, Message } from '@/types/api';
+import type { Thread, Message, Artifact } from '@/types/api';
 
 interface ChatStore {
   // User identity (anonymous UUID stored in localStorage)
@@ -33,8 +33,9 @@ interface ChatStore {
   clearStreamingDraft: () => void;
 
   // Live tool execution drafts shown inline while tools run
-  toolDrafts: { threadId: string; name: string; input?: any }[];
+  toolDrafts: { threadId: string; name: string; input?: any; artifacts?: Artifact[] }[];
   addToolDraft: (threadId: string, name: string, input?: any) => void;
+  updateToolDraft: (threadId: string, name: string, updates: { artifacts?: Artifact[] }) => void;
   removeToolDraft: (threadId: string, name: string) => void;
 
   // UI state
@@ -100,6 +101,12 @@ export const useChatStore = create<ChatStore>((set) => ({
   toolDrafts: [],
   addToolDraft: (threadId, name, input) =>
     set((state) => ({ toolDrafts: [...state.toolDrafts, { threadId, name, input }] })),
+  updateToolDraft: (threadId, name, updates) =>
+    set((state) => ({
+      toolDrafts: state.toolDrafts.map((t) =>
+        t.threadId === threadId && t.name === name ? { ...t, ...updates } : t
+      ),
+    })),
   removeToolDraft: (threadId, name) =>
     set((state) => ({ toolDrafts: state.toolDrafts.filter((t) => !(t.threadId === threadId && t.name === name)) })),
 

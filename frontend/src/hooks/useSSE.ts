@@ -6,10 +6,12 @@
 import { useCallback, useRef, useState } from 'react';
 import type { SSEEvent } from '@/types/api';
 
+import type { Artifact } from '@/types/api';
+
 interface UseSSEOptions {
   onToken?: (content: string) => void;
   onToolStart?: (name: string, input: any) => void;
-  onToolEnd?: (name: string, output: any) => void;
+  onToolEnd?: (name: string, output: any, artifacts?: Artifact[]) => void;
   onTitleUpdated?: (title: string) => void;
   onContextUpdate?: (tokensUsed: number, maxTokens: number) => void;
   onSummarizing?: (status: 'start' | 'done') => void;
@@ -82,7 +84,7 @@ export function useSSE(options: UseSSEOptions) {
                 } else if (event.type === 'tool_start') {
                   options.onToolStart?.(event.name, event.input);
                 } else if (event.type === 'tool_end') {
-                  options.onToolEnd?.(event.name, event.output);
+                  options.onToolEnd?.(event.name, event.output, event.artifacts);
                 } else if (event.type === 'title_updated') {
                   options.onTitleUpdated?.(event.title);
                 } else if (event.type === 'context_update') {

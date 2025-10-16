@@ -27,6 +27,7 @@ export function MessageInput() {
   const [input, setInput] = useState('');
   const streamingRef = useRef(''); // Accumulate streaming tokens (mirror to avoid stale closure on onDone)
   const addToolDraft = useChatStore((state) => state.addToolDraft);
+  const updateToolDraft = useChatStore((state) => state.updateToolDraft);
   const removeToolDraft = useChatStore((state) => state.removeToolDraft);
   
   // SSE hook with handlers for streaming events
@@ -40,9 +41,19 @@ export function MessageInput() {
       console.log(`Tool started: ${name}`, input);
       if (currentThreadId) addToolDraft(currentThreadId, name, input);
     },
-    onToolEnd: (name, output) => {
-      console.log(`Tool finished: ${name}`, output);
-      if (currentThreadId) removeToolDraft(currentThreadId, name);
+    onToolEnd: (name, output, artifacts) => {
+      console.log(`Tool finished: ${name}`, output, artifacts);
+      if (currentThreadId) {
+        // If artifacts were generated, update the draft to show them
+        if (artifacts && artifacts.length > 0) {
+          updateToolDraft(currentThreadId, name, { artifacts });
+          // Keep the draft visible for a moment to show artifacts, then remove
+          setTimeout(() => removeToolDraft(currentThreadId, name), 10000);
+        } else {
+          // No artifacts, remove immediately
+          removeToolDraft(currentThreadId, name);
+        }
+      }
     },
     onTitleUpdated: (title) => {
       // Update thread title in sidebar when auto-title completes
