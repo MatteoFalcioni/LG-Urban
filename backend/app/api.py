@@ -366,6 +366,17 @@ async def update_thread_config(
 
 
 # Response schema for messages
+class ArtifactOut(BaseModel):
+    id: UUID
+    name: str
+    mime: str
+    size: int
+    url: str
+    
+    class Config:
+        from_attributes = True
+
+
 class MessageOut(BaseModel):
     id: UUID
     thread_id: UUID
@@ -374,6 +385,7 @@ class MessageOut(BaseModel):
     tool_name: Optional[str] = None
     tool_input: Optional[dict] = None
     tool_output: Optional[dict] = None
+    artifacts: list[ArtifactOut] = []
 
     class Config:
         from_attributes = True
@@ -388,7 +400,11 @@ async def list_messages(
     """
     List recent messages for a thread (reverse chronological by created_at).
     Only finalized messages are stored and returned (no partial tokens).
+    Includes artifacts associated with each message via tool_call_id.
     """
+    from backend.db.models import Artifact
+    from backend.artifacts.tokens import create_download_url
+    
     stmt = (
         select(Message)
         .where(Message.thread_id == thread_id)
@@ -396,8 +412,60 @@ async def list_messages(
         .limit(limit)
     )
     res = await session.execute(stmt)
-    rows = res.scalars().all()
-    return [MessageOut.model_validate(r) for r in rows]
+    messages = res.scalars().all()
+    
+    # Build message outputs with artifacts
+    message_outputs = []
+    for msg in messages:
+        msg_dict = {
+            "id": msg.id,
+            "thread_id": msg.thread_id,
+            "role": msg.role,
+            "content": msg.content,
+            "tool_name": msg.tool_name,
+            "tool_input": msg.tool_input,
+            "tool_output": msg.tool_output,
+            "artifacts": [],
+        }
+        
+        # If this is a tool message, fetch associated artifacts
+        if msg.role == "tool":
+            # Extract tool_call_id from tool_input (where it's actually stored)
+            tool_call_id = None
+            if isinstance(msg.tool_input, dict):
+                tool_call_id = msg.tool_input.get("tool_call_id")
+            
+            # Fallback: check tool_output
+            if not tool_call_id and isinstance(msg.tool_output, dict):
+                tool_call_id = msg.tool_output.get("tool_call_id")
+            
+            # Also check meta field
+            if not tool_call_id and msg.meta:
+                tool_call_id = msg.meta.get("tool_call_id")
+            
+            if tool_call_id:
+                # Query artifacts for this tool call
+                artifact_stmt = select(Artifact).where(Artifact.tool_call_id == tool_call_id)
+                artifact_res = await session.execute(artifact_stmt)
+                artifacts = artifact_res.scalars().all()
+                
+                # Build artifact outputs with download URLs
+                for artifact in artifacts:
+                    try:
+                        url = create_download_url(str(artifact.id))
+                        msg_dict["artifacts"].append({
+                            "id": artifact.id,
+                            "name": artifact.filename,
+                            "mime": artifact.mime,
+                            "size": artifact.size,
+                            "url": url,
+                        })
+                    except Exception as e:
+                        print(f"Warning: Could not create URL for artifact {artifact.id}: {e}")
+        
+        message_outputs.append(MessageOut.model_validate(msg_dict))
+    
+    return message_outputs
 
 
 
@@ -555,10 +623,20 @@ async def post_message_stream(
                             # Fallback to jsonable representation
                             tool_output_for_db = to_jsonable(raw_output)
                         
+                        # Extract tool_call_id from raw_output if available
+                        tool_call_id = None
+                        if isinstance(raw_output, dict):
+                            # Check in the Command structure
+                            if "update" in raw_output and isinstance(raw_output["update"], dict):
+                                messages_update = raw_output["update"].get("messages", [])
+                                if messages_update and isinstance(messages_update[0], dict):
+                                    tool_call_id = messages_update[0].get("tool_call_id")
+                        
                         tool_calls.append({
                             "name": event_name,
                             "input": to_jsonable(raw_input),
                             "output": tool_output_for_db,
+                            "tool_call_id": tool_call_id,
                         })
                         
                         # Include artifacts in SSE event for frontend
@@ -587,6 +665,9 @@ async def post_message_stream(
                 async with ASYNC_SESSION_MAKER() as write_sess:
                     # Tool messages first
                     for idx, tool_call in enumerate(tool_calls):
+                        # Extract tool_call_id if available
+                        tool_call_id = tool_call.get("id") or tool_call.get("tool_call_id")
+                        
                         tool_msg = Message(
                             thread_id=t.id,
                             message_id=f"tool:{payload.message_id}:{idx}",
@@ -595,6 +676,7 @@ async def post_message_stream(
                             tool_input=tool_call.get("input"),
                             tool_output=tool_call.get("output"),
                             content=None,
+                            meta={"tool_call_id": tool_call_id} if tool_call_id else None,
                         )
                         write_sess.add(tool_msg)
 

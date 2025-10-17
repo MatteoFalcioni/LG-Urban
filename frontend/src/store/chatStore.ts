@@ -40,6 +40,7 @@ interface ChatStore {
   // Artifact bubbles (separate from tool drafts, persistent)
   artifactBubbles: { threadId: string; toolName: string; artifacts: Artifact[] }[];
   addArtifactBubble: (threadId: string, toolName: string, artifacts: Artifact[]) => void;
+  clearArtifactBubbles: (threadId: string) => void;
 
   // UI state
   isSidebarOpen: boolean;
@@ -87,7 +88,7 @@ export const useChatStore = create<ChatStore>((set) => ({
     })),
 
   currentThreadId: null,
-  setCurrentThreadId: (id) => set({ currentThreadId: id, messages: [], artifactBubbles: [] }),
+  setCurrentThreadId: (id) => set({ currentThreadId: id, messages: [] }),
 
   messages: [],
   setMessages: (messages) => set({ messages }),
@@ -110,6 +111,8 @@ export const useChatStore = create<ChatStore>((set) => ({
   artifactBubbles: [],
   addArtifactBubble: (threadId, toolName, artifacts) =>
     set((state) => ({ artifactBubbles: [...state.artifactBubbles, { threadId, toolName, artifacts }] })),
+  clearArtifactBubbles: (threadId) =>
+    set((state) => ({ artifactBubbles: state.artifactBubbles.filter((a) => a.threadId !== threadId) })),
 
   isSidebarOpen: true,
   toggleSidebar: () => set((state) => ({ isSidebarOpen: !state.isSidebarOpen })),

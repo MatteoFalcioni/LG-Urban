@@ -93,33 +93,44 @@ def put_bytes(container, container_path: str, data: bytes, *, mode: int = 0o644)
     except Exception as e:
         print(f"put_archive exception: {e}, trying base64 fallback...")
     
-    # Fallback to base64 method for small files
-    print(f"Using base64 fallback to write {container_path}")
+    # Fallback to base64 method with chunking (for files that exceed arg list limit)
+    print(f"Using base64 chunked fallback to write {container_path} ({len(data)} bytes)")
     data_b64 = base64.b64encode(data).decode('ascii')
     
-    # Use Python to decode and write (more reliable than bash)
-    python_code = f"""
-import base64
-data = '{data_b64}'
-with open('{container_path}', 'wb') as f:
-    f.write(base64.b64decode(data))
-print(f"Wrote {{len(base64.b64decode(data))}} bytes to {container_path}")
-"""
+    # Use 1000 base64 characters per chunk to avoid "argument list too long" error
+    chunk_size = 1000
+    chunks = [data_b64[i:i+chunk_size] for i in range(0, len(data_b64), chunk_size)]
     
+    print(f"Writing {len(chunks)} chunks...")
+    
+    # Create empty file first
     exec_result = container.exec_run(
-        ["python3", "-c", python_code],
+        ["sh", "-c", f"cat /dev/null > {container_path}"],
         user="root"
     )
-    
     if exec_result.exit_code != 0:
-        raise RuntimeError(f"Failed to write file using base64 method: {exec_result.output.decode()}")
+        raise RuntimeError(f"Failed to create empty file {container_path}: {exec_result.output.decode()}")
     
-    print(f"Base64 write output: {exec_result.output.decode()}")
+    # Write chunks one by one
+    for i, chunk in enumerate(chunks):
+        exec_result = container.exec_run(
+            ["sh", "-c", f"echo -n '{chunk}' | base64 -d >> {container_path}"],
+            user="root"
+        )
+        if exec_result.exit_code != 0:
+            raise RuntimeError(f"Failed to write chunk {i+1}/{len(chunks)}: {exec_result.output.decode()}")
+        
+        if (i + 1) % 100 == 0:
+            print(f"Progress: {i+1}/{len(chunks)} chunks written")
+    
+    print(f"All {len(chunks)} chunks written successfully")
     
     # Final verification
-    exec_result = container.exec_run(["ls", "-la", container_path], user="root")
+    exec_result = container.exec_run(["ls", "-lh", container_path], user="root")
     if exec_result.exit_code != 0:
-        raise RuntimeError(f"File verification failed after base64 write: {exec_result.output.decode()}")
+        raise RuntimeError(f"File verification failed after chunked write: {exec_result.output.decode()}")
+    
+    print(f"File verified: {exec_result.output.decode()}")
 
 
 def get_session_key():

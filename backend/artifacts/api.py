@@ -50,11 +50,21 @@ async def download_artifact(
         raise HTTPException(status_code=410, detail="Blob missing (pruned?)")
 
     # 4) Stream it
-    return FileResponse(
+    # For HTML and images, display inline. For other files, download.
+    inline_mimes = ["text/html", "image/png", "image/jpeg", "image/jpg", "image/gif", "image/webp", "image/svg+xml"]
+    
+    response = FileResponse(
         path=str(blob_path),
         media_type=artifact.mime or "application/octet-stream",
-        filename=artifact.filename or artifact_id,
     )
+    
+    # Set Content-Disposition header
+    if artifact.mime in inline_mimes:
+        response.headers["Content-Disposition"] = "inline"
+    else:
+        response.headers["Content-Disposition"] = f'attachment; filename="{artifact.filename or artifact_id}"'
+    
+    return response
 
 
 @router.get("/{artifact_id}/head")

@@ -18,6 +18,7 @@ export interface Message {
   tool_name?: string | null;
   tool_input?: Record<string, any> | null;
   tool_output?: Record<string, any> | null;
+  artifacts?: Artifact[];
 }
 
 export interface ThreadConfig {

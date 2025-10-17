@@ -7,7 +7,7 @@ import { useState, useRef } from 'react';
 import { Send, Loader2 } from 'lucide-react';
 import { useChatStore } from '@/store/chatStore';
 import { useSSE } from '@/hooks/useSSE';
-import { createThread, updateThreadConfig } from '@/utils/api';
+import { createThread, updateThreadConfig, listMessages } from '@/utils/api';
 import type { Message } from '@/types/api';
 
 export function MessageInput() {
@@ -23,12 +23,14 @@ export function MessageInput() {
   const setThreads = useChatStore((state) => state.setThreads);
   const setContextUsage = useChatStore((state) => state.setContextUsage);
   const setIsSummarizing = useChatStore((state) => state.setIsSummarizing);
+  const setMessages = useChatStore((state) => state.setMessages);
   
   const [input, setInput] = useState('');
   const streamingRef = useRef(''); // Accumulate streaming tokens (mirror to avoid stale closure on onDone)
   const addToolDraft = useChatStore((state) => state.addToolDraft);
   const removeToolDraft = useChatStore((state) => state.removeToolDraft);
   const addArtifactBubble = useChatStore((state) => state.addArtifactBubble);
+  const clearArtifactBubbles = useChatStore((state) => state.clearArtifactBubbles);
   
   // SSE hook with handlers for streaming events
   const { sendMessage, isStreaming } = useSSE({
@@ -47,7 +49,7 @@ export function MessageInput() {
         // Always remove tool draft when complete
         removeToolDraft(currentThreadId, name);
         
-        // If artifacts were generated, add them as a separate bubble
+        // Show artifacts immediately during streaming
         if (artifacts && artifacts.length > 0) {
           addArtifactBubble(currentThreadId, name, artifacts);
         }
@@ -67,9 +69,11 @@ export function MessageInput() {
       // Show/hide summarization animation
       setIsSummarizing(status === 'start');
     },
-    onDone: (messageId) => {
+    onDone: async (messageId) => {
+      console.log('onDone called with messageId:', messageId);
       // Stream complete; add finalized assistant message to state
       const finalText = streamingRef.current.trim();
+      console.log('Final text length:', finalText.length);
       if (finalText) {
         const assistantMsg: Message = {
           id: messageId || crypto.randomUUID(),
@@ -82,6 +86,27 @@ export function MessageInput() {
       // Reset streaming state
       streamingRef.current = '';
       clearDraft();
+      
+      // Refetch messages from DB to get artifacts properly linked
+      if (currentThreadId) {
+        console.log('Starting refetch process for thread:', currentThreadId);
+        // Delay to ensure backend has persisted everything and user can see the bubbles
+        setTimeout(async () => {
+          try {
+            console.log('Refetching messages for thread:', currentThreadId);
+            const messages = await listMessages(currentThreadId);
+            console.log('Refetched messages:', messages.length, 'messages');
+            console.log('Messages with artifacts:', messages.filter(m => m.artifacts && m.artifacts.length > 0));
+            setMessages(messages.reverse());
+            // Clear artifact bubbles now that we have DB artifacts
+            clearArtifactBubbles(currentThreadId);
+          } catch (err) {
+            console.error('Failed to refetch messages:', err);
+          }
+        }, 2000); // 2 seconds gives user time to see the artifacts appear
+      } else {
+        console.log('No currentThreadId, skipping refetch');
+      }
     },
     onError: (error) => {
       console.error('Stream error:', error);

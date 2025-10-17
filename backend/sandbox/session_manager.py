@@ -805,6 +805,7 @@ if session_artifacts.exists():
         timeout: int = 30,
         db_session=None,
         thread_id=None,
+        tool_call_id=None,
     ) -> dict:
         """
         Execute Python code inside the session's container via the in-container REPL.
@@ -906,7 +907,7 @@ if session_artifacts.exists():
                 new_host_files=host_files,
                 session_id=session_key,
                 run_id=None,
-                tool_call_id=None,
+                tool_call_id=tool_call_id,
             )
         else:
             # Fallback: just clean up files without ingesting
@@ -994,6 +995,7 @@ if session_artifacts.exists():
         container_path: str,
         db_session=None,
         thread_id=None,
+        tool_call_id=None,
     ) -> dict:
         """
         Export a file from the container's /data/ directory to the host.
@@ -1067,7 +1069,7 @@ if session_artifacts.exists():
                     new_host_files=[Path(temp_copy.name)],
                     session_id=session_key,
                     run_id=None,
-                    tool_call_id=None,
+                    tool_call_id=tool_call_id,
                 )
             
             # Clean up the temporary file (ingest_files already deleted it, but just to be safe)

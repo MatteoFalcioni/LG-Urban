@@ -73,7 +73,7 @@ def make_code_sandbox_tool(
 
         # Execute code - no dataset loading here anymore
         result = await session_manager.exec(
-            sid, code, timeout=timeout_s, db_session=db_session, thread_id=thread_id
+            sid, code, timeout=timeout_s, db_session=db_session, thread_id=thread_id, tool_call_id=tool_call_id
         )
 
         payload = {

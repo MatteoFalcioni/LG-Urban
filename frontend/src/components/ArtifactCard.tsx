@@ -51,10 +51,10 @@ export function ArtifactCard({ artifact }: ArtifactCardProps) {
       
       {/* HTML preview for HTML files */}
       {isHtml && (
-        <div className="rounded-lg overflow-hidden border border-gray-200 dark:border-slate-600">
+        <div className="rounded-lg overflow-hidden border border-gray-200 dark:border-slate-600 bg-white dark:bg-slate-900">
           <iframe
             src={url}
-            className="w-full h-96 bg-white dark:bg-slate-900"
+            className="w-full h-96 border-0 bg-white"
             title={name}
             sandbox="allow-scripts allow-same-origin"
           />
