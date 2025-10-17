@@ -97,8 +97,8 @@ def put_bytes(container, container_path: str, data: bytes, *, mode: int = 0o644)
     print(f"Using base64 chunked fallback to write {container_path} ({len(data)} bytes)")
     data_b64 = base64.b64encode(data).decode('ascii')
     
-    # Use 1000 base64 characters per chunk to avoid "argument list too long" error
-    chunk_size = 1000
+    # Use 2000 base64 characters per chunk to avoid "argument list too long" error
+    chunk_size = 2000
     chunks = [data_b64[i:i+chunk_size] for i in range(0, len(data_b64), chunk_size)]
     
     print(f"Writing {len(chunks)} chunks...")
