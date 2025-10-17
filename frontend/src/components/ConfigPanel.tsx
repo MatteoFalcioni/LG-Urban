@@ -140,12 +140,10 @@ export function ConfigPanel() {
         <div>
           <label className="block text-sm font-medium mb-1">Model</label>
           <select
-            value={config.model || 'gpt-4o'}
+            value={config.model || 'gpt-4.1'}
             onChange={(e) => setConfig({ ...config, model: e.target.value })}
             className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
-            <option value="gpt-4o">GPT-4o</option>
-            <option value="gpt-4o-mini">GPT-4o Mini</option>
             <option value="gpt-4.1">GPT-4.1</option>
             <option value="gpt-5">GPT-5</option>
           </select>
