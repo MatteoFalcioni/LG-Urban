@@ -88,6 +88,7 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock  # Allow backend to spawn sandbox containers
       - blobstore:/app/blobstore
       - sessions:/app/sessions
+      - checkpoints:/app/checkpoints  # LangGraph SQLite checkpointer persistence
       - ./heavy_llm_data:/heavy_llm_data:ro  # Heavy datasets for HYBRID mode
     deploy:
       resources:
@@ -132,6 +133,7 @@ volumes:
   pg_data:
   blobstore:
   sessions:
+  checkpoints:
 
 networks:
   langgraph-network:

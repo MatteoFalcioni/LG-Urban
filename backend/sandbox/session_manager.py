@@ -50,7 +50,7 @@ DEFAULT_IMAGE = "sandbox:latest"
 
 # If a session hasn't been touched for this many seconds, we consider it idle.
 # We opportunistically sweep (cleanup) in start/exec calls.
-IDLE_TIMEOUT_SECS = 45 * 60  # 45 minutes (tune to your infra)
+IDLE_TIMEOUT_SECS = 6 * 60 * 60  # 6 hours (tune to your infra)
 
 
 class SessionInfo:

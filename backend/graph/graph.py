@@ -34,8 +34,8 @@ from backend.config import CONTEXT_WINDOW
 
 load_dotenv()
 
-# LangGraph per-convo memory (sqlite). Use env or fallback to local file.
-DB_PATH = os.getenv("LANGGRAPH_CHECKPOINT_DB", os.path.abspath(".lg_checkpoints.sqlite"))
+# LangGraph per-convo memory (sqlite). Use env or fallback to mounted volume.
+DB_PATH = os.getenv("LANGGRAPH_CHECKPOINT_DB", "/app/checkpoints/.lg_checkpoints.sqlite")
 
 async def get_checkpointer():
     """
