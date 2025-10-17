@@ -7,6 +7,7 @@ from uuid import UUID
 import logging
 import uuid
 import json
+import asyncio
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
@@ -391,6 +392,59 @@ class MessageOut(BaseModel):
         from_attributes = True
 
 
+@router.get("/threads/{thread_id}/state")
+async def get_thread_state(
+    thread_id: str,
+    session: AsyncSession = Depends(get_session),
+):
+    """
+    Get the current LangGraph state for a thread, including token count.
+    This allows the frontend to display context usage without sending a message.
+    """
+    from backend.graph.graph import make_graph
+    from backend.main import _checkpointer_cm
+    from backend.config import CONTEXT_WINDOW as DEFAULT_CONTEXT_WINDOW
+    
+    # Ensure thread exists
+    t = await session.get(Thread, thread_id)
+    if not t:
+        raise HTTPException(status_code=404, detail="Thread not found")
+    
+    # Read thread config to get context_window
+    cfg = await session.get(Config, thread_id)
+    
+    if not _checkpointer_cm:
+        raise HTTPException(status_code=500, detail="Checkpointer not initialized")
+    
+    # Create graph with thread-specific config
+    graph = make_graph(
+        model_name=cfg.model if cfg else None,
+        temperature=cfg.temperature if cfg else None,
+        system_prompt=cfg.system_prompt if cfg else None,
+        context_window=cfg.context_window if cfg else None,
+        checkpointer=_checkpointer_cm[0],
+    )
+    
+    config = {"configurable": {"thread_id": str(thread_id)}}
+    
+    try:
+        state_snapshot = await graph.aget_state(config)
+        token_count = state_snapshot.values.get("token_count", 0) if state_snapshot.values else 0
+        context_window = cfg.context_window if (cfg and cfg.context_window) else DEFAULT_CONTEXT_WINDOW
+        
+        return {
+            "token_count": token_count,
+            "context_window": context_window
+        }
+    except Exception as e:
+        # If state doesn't exist yet (new thread), return 0
+        context_window = cfg.context_window if (cfg and cfg.context_window) else DEFAULT_CONTEXT_WINDOW
+        return {
+            "token_count": 0,
+            "context_window": context_window
+        }
+
+
 @router.get("/threads/{thread_id}/messages", response_model=list[MessageOut])
 async def list_messages(
     thread_id: str,
@@ -559,7 +613,7 @@ async def post_message_stream(
     except Exception:
         await session.rollback()
         raise HTTPException(status_code=409, detail="Duplicate message_id")
-
+    
     # Stream LangGraph agent response via SSE
     async def event_stream():
         from backend.main import get_thread_lock
@@ -585,8 +639,6 @@ async def post_message_stream(
         request_id = request.headers.get("x-request-id") or str(uuid.uuid4())
         assistant_content = None
         tool_calls = []  # Track tool calls for persistence
-        was_cancelled = False  # Track if client disconnected
-        initial_message_count = 0  # Track how many messages existed before this turn
         
         try:
             lock = get_thread_lock(str(thread_id))
@@ -601,13 +653,10 @@ async def post_message_stream(
                 config = {"configurable": {"thread_id": str(thread_id)}}
                 
                 # Get context usage from graph state BEFORE streaming
-                # Also capture initial message count to know what to remove on cancellation
                 try:
                     from backend.config import CONTEXT_WINDOW as DEFAULT_CONTEXT_WINDOW
                     state_snapshot = await graph.aget_state(config)
                     token_count = state_snapshot.values.get("token_count", 0) if state_snapshot.values else 0
-                    # Capture how many messages exist BEFORE we add the new user message
-                    initial_message_count = len(state_snapshot.values.get("messages", [])) if state_snapshot.values else 0
                     # Use thread config context_window or env default
                     max_tokens = cfg.context_window if cfg and cfg.context_window else DEFAULT_CONTEXT_WINDOW
                     # Emit context update for frontend circle
@@ -618,11 +667,6 @@ async def post_message_stream(
                 # Stream events from LangGraph
                 # We follow docs here: https://python.langchain.com/api_reference/core/language_models/langchain_core.language_models.chat_models.BaseChatModel.html?_gl=1*15ktatf*_gcl_au*MTc4MTgwMzA1Ny4xNzU4ODA2Mjcy*_ga*MTUzOTQwNjk3NS4xNzUwODY1MDM0*_ga_47WX3HKKY2*czE3NTk4MjY0Mzkkbzk5JGcxJHQxNzU5ODI2NTg0JGoxMyRsMCRoMA..#langchain_core.language_models.chat_models.BaseChatModel.astream_events
                 async for event in graph.astream_events(state, config, version="v2"):
-                    # Check if client disconnected before processing each event
-                    if await request.is_disconnected():
-                        print(f"=== Client disconnected for thread {thread_id}, stopping stream ===")
-                        was_cancelled = True
-                        break
                     event_type = event.get("event")
                     event_name = event.get("name", "")
                     event_meta = event.get("metadata", {})
@@ -734,127 +778,84 @@ async def post_message_stream(
                         if output and hasattr(output, "content"):
                             assistant_content = output.content
                 
-                # Only persist to Postgres if the stream was not cancelled
-                if not was_cancelled:
-                    # Persist using a short-lived session to avoid holding an open connection during SSE
-                    a_msg_id = None
-                    print(f"=== DEBUG post_message_stream: Persisting {len(tool_calls)} tool calls ===")
-                    async with ASYNC_SESSION_MAKER() as write_sess:
-                        # Tool messages first
-                        for idx, tool_call in enumerate(tool_calls):
-                            print(f"=== DEBUG post_message_stream: Processing tool_call {idx}: {tool_call.get('name')} ===")
-                            # Extract tool_call_id if available
-                            tool_call_id = tool_call.get("id") or tool_call.get("tool_call_id")
-                            
-                            # Add tool_call_id to tool_input for easier retrieval
-                            tool_input = tool_call.get("input", {})
-                            if isinstance(tool_input, dict) and tool_call_id:
-                                tool_input = {**tool_input, "tool_call_id": tool_call_id}
-                            
-                            tool_msg = Message(
-                                thread_id=t.id,
-                                message_id=f"tool:{payload.message_id}:{idx}",
-                                role="tool",
-                                tool_name=tool_call["name"],
-                                tool_input=tool_input,
-                                tool_output=tool_call.get("output"),
-                                content=None,
-                                meta={"tool_call_id": tool_call_id} if tool_call_id else None,
-                            )
-                            write_sess.add(tool_msg)
-                            print(f"=== DEBUG post_message_stream: Added tool message {tool_msg.message_id} with tool_call_id={tool_call_id} ===")
-
-                        # Assistant message
-                        if assistant_content:
-                            a_msg = Message(
-                                thread_id=t.id,
-                                message_id=f"assistant:{payload.message_id}",
-                                role="assistant",
-                                content={"text": assistant_content} if isinstance(assistant_content, str) else assistant_content,
-                            )
-                            write_sess.add(a_msg)
-                            await write_sess.commit()
-                            a_msg_id = str(a_msg.id)
-                        elif tool_calls:
-                            await write_sess.commit()
-
-                    # Auto-title in a separate short-lived session (best-effort)
-                    if a_msg_id:
-                        try:
-                            from langchain_openai import ChatOpenAI
-                            from langchain_core.prompts import ChatPromptTemplate
-                            from langchain_core.output_parsers import StrOutputParser
-                            async with ASYNC_SESSION_MAKER() as title_sess:
-                                thread_check = await title_sess.get(Thread, t.id)
-                                if thread_check and thread_check.title == "New chat":
-                                    stmt = (
-                                        select(Message)
-                                        .where(Message.thread_id == thread_check.id)
-                                        .order_by(Message.created_at.asc())
-                                        .limit(4)
-                                    )
-                                    res = await title_sess.execute(stmt)
-                                    messages = res.scalars().all()
-                                    thread_text = "\n".join([
-                                        f"{m.role}: {m.content.get('text', str(m.content)) if m.content else ''}"
-                                        for m in messages
-                                    ])
-                                    llm = ChatOpenAI(model="gpt-4o-mini", temperature=0)
-                                    prompt = ChatPromptTemplate.from_messages([
-                                        ("system", "Return a concise, engaging title. No quotes, <= 8 words."),
-                                        ("user", "Text:\n{body}\n\nTitle:")
-                                    ])
-                                    chain = prompt | llm | StrOutputParser()
-                                    new_title = chain.invoke({"body": thread_text})
-                                    thread_check.title = new_title
-                                    await title_sess.commit()
-                                    # Notify frontend of title update
-                                    yield f"data: {json.dumps({'type': 'title_updated', 'title': new_title})}\n\n"
-                        except Exception as e:
-                            logging.warning(f"Auto-title failed: {e}")
-
-                    yield f"data: {json.dumps({'type': 'done', 'message_id': a_msg_id})}\n\n"
-                
-                else:
-                    # Stream was cancelled - clean up LangGraph checkpoint
-                    print(f"=== Stream cancelled, cleaning up LangGraph checkpoint ===")
-                    try:
-                        # Get current state after partial execution
-                        current_state = await graph.aget_state(config)
+                # Persist using a short-lived session to avoid holding an open connection during SSE
+                a_msg_id = None
+                print(f"=== DEBUG post_message_stream: Persisting {len(tool_calls)} tool calls ===")
+                async with ASYNC_SESSION_MAKER() as write_sess:
+                    # Tool messages first
+                    for idx, tool_call in enumerate(tool_calls):
+                        print(f"=== DEBUG post_message_stream: Processing tool_call {idx}: {tool_call.get('name')} ===")
+                        # Extract tool_call_id if available
+                        tool_call_id = tool_call.get("id") or tool_call.get("tool_call_id")
                         
-                        if current_state.values and "messages" in current_state.values:
-                            current_messages = current_state.values["messages"]
-                            current_message_count = len(current_messages)
-                            
-                            # Calculate how many messages were added during this turn
-                            messages_added = current_message_count - initial_message_count
-                            
-                            if messages_added > 0:
-                                print(f"=== Removing {messages_added} messages added during cancelled turn ===")
-                                # Remove the last N messages that were added during this turn
-                                from langchain_core.messages import RemoveMessage
-                                
-                                messages_to_remove = []
-                                for msg in current_messages[-messages_added:]:
-                                    messages_to_remove.append(RemoveMessage(id=msg.id))
-                                    print(f"=== Marking message for removal: {msg.id} (type: {msg.type}) ===")
-                                
-                                # Update state to remove these messages
-                                await graph.aupdate_state(
-                                    config,
-                                    {"messages": messages_to_remove},
+                        # Add tool_call_id to tool_input for easier retrieval
+                        tool_input = tool_call.get("input", {})
+                        if isinstance(tool_input, dict) and tool_call_id:
+                            tool_input = {**tool_input, "tool_call_id": tool_call_id}
+                        
+                        tool_msg = Message(
+                            thread_id=t.id,
+                            message_id=f"tool:{payload.message_id}:{idx}",
+                            role="tool",
+                            tool_name=tool_call["name"],
+                            tool_input=tool_input,
+                            tool_output=tool_call.get("output"),
+                            content=None,
+                            meta={"tool_call_id": tool_call_id} if tool_call_id else None,
+                        )
+                        write_sess.add(tool_msg)
+                        print(f"=== DEBUG post_message_stream: Added tool message {tool_msg.message_id} with tool_call_id={tool_call_id} ===")
+
+                    # Assistant message
+                    if assistant_content:
+                        a_msg = Message(
+                            thread_id=t.id,
+                            message_id=f"assistant:{payload.message_id}",
+                            role="assistant",
+                            content={"text": assistant_content} if isinstance(assistant_content, str) else assistant_content,
+                        )
+                        write_sess.add(a_msg)
+                        await write_sess.commit()
+                        a_msg_id = str(a_msg.id)
+                    elif tool_calls:
+                        await write_sess.commit()
+
+                # Auto-title in a separate short-lived session (best-effort)
+                if a_msg_id:
+                    try:
+                        from langchain_openai import ChatOpenAI
+                        from langchain_core.prompts import ChatPromptTemplate
+                        from langchain_core.output_parsers import StrOutputParser
+                        async with ASYNC_SESSION_MAKER() as title_sess:
+                            thread_check = await title_sess.get(Thread, t.id)
+                            if thread_check and thread_check.title == "New chat":
+                                stmt = (
+                                    select(Message)
+                                    .where(Message.thread_id == thread_check.id)
+                                    .order_by(Message.created_at.asc())
+                                    .limit(4)
                                 )
-                                print(f"=== Successfully removed {len(messages_to_remove)} messages from checkpoint ===")
-                            else:
-                                print(f"=== No new messages to remove (initial={initial_message_count}, current={current_message_count}) ===")
-                        else:
-                            print(f"=== No messages in current state ===")
-                    
+                                res = await title_sess.execute(stmt)
+                                messages = res.scalars().all()
+                                thread_text = "\n".join([
+                                    f"{m.role}: {m.content.get('text', str(m.content)) if m.content else ''}"
+                                    for m in messages
+                                ])
+                                llm = ChatOpenAI(model="gpt-4o-mini", temperature=0)
+                                prompt = ChatPromptTemplate.from_messages([
+                                    ("system", "Return a concise, engaging title. No quotes, <= 8 words."),
+                                    ("user", "Text:\n{body}\n\nTitle:")
+                                ])
+                                chain = prompt | llm | StrOutputParser()
+                                new_title = chain.invoke({"body": thread_text})
+                                thread_check.title = new_title
+                                await title_sess.commit()
+                                # Notify frontend of title update
+                                yield f"data: {json.dumps({'type': 'title_updated', 'title': new_title})}\n\n"
                     except Exception as e:
-                        print(f"=== WARNING: Failed to cleanup LangGraph checkpoint: {e} ===")
-                        # Continue anyway - partial state may remain in LangGraph but Postgres is clean
-                    
-                    yield f"data: {json.dumps({'type': 'cancelled'})}\n\n"
+                        logging.warning(f"Auto-title failed: {e}")
+
+                yield f"data: {json.dumps({'type': 'done', 'message_id': a_msg_id})}\n\n"
                     
         except Exception as e:
             logging.exception(
@@ -868,5 +869,4 @@ async def post_message_stream(
             yield f"data: {json.dumps({'type': 'error', 'error': str(e)})}\n\n"
 
     return StreamingResponse(event_stream(), media_type="text/event-stream")
-
 
