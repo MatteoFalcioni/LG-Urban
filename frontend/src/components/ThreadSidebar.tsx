@@ -4,7 +4,7 @@
  */
 
 import { useEffect, useState } from 'react';
-import { Plus, MessageSquare, Sun, Moon, Trash2, Archive, Edit2 } from 'lucide-react';
+import { Plus, MessageSquare, Sun, Moon, Trash2, Archive, Edit2, CheckSquare, Square } from 'lucide-react';
 import { useChatStore } from '@/store/chatStore';
 import { createThread, listThreads, archiveThread, unarchiveThread, deleteThread, updateThreadTitle } from '@/utils/api';
 import type { Thread } from '@/types/api';
@@ -24,6 +24,13 @@ export function ThreadSidebar() {
   const [isCreating, setIsCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showArchived, setShowArchived] = useState(false);
+  
+  // Bulk selection state
+  const selectedThreadIds = useChatStore((state) => state.selectedThreadIds);
+  const toggleThreadSelection = useChatStore((state) => state.toggleThreadSelection);
+  const selectAllThreads = useChatStore((state) => state.selectAllThreads);
+  const clearThreadSelection = useChatStore((state) => state.clearThreadSelection);
+  const [showBulkActions, setShowBulkActions] = useState(false);
 
   /**
    * Cycle through theme options: light -> dark -> auto -> light
@@ -65,6 +72,53 @@ export function ThreadSidebar() {
     }
   }
 
+  // Toggle select all
+  function handleSelectAll() {
+    if (selectedThreadIds.size === threads.length) {
+      clearThreadSelection();
+    } else {
+      selectAllThreads(threads.map((t) => t.id));
+    }
+  }
+
+  // Bulk delete selected threads
+  async function handleBulkDelete() {
+    if (!confirm(`Delete ${selectedThreadIds.size} thread(s)? This cannot be undone.`)) return;
+
+    try {
+      await Promise.all(Array.from(selectedThreadIds).map((id) => deleteThread(id)));
+      // Remove deleted threads from list
+      setThreads(threads.filter((t) => !selectedThreadIds.has(t.id)));
+      // Clear current thread if it was deleted
+      if (currentThreadId && selectedThreadIds.has(currentThreadId)) {
+        setCurrentThreadId(null);
+      }
+      clearThreadSelection();
+      setShowBulkActions(false);
+    } catch (err) {
+      alert('Failed to delete some threads');
+    }
+  }
+
+  // Bulk archive selected threads
+  async function handleBulkArchive() {
+    try {
+      await Promise.all(Array.from(selectedThreadIds).map((id) => archiveThread(id)));
+      // Remove archived threads from list (unless showing archived)
+      if (!showArchived) {
+        setThreads(threads.filter((t) => !selectedThreadIds.has(t.id)));
+      }
+      // Clear current thread if it was archived
+      if (currentThreadId && selectedThreadIds.has(currentThreadId)) {
+        setCurrentThreadId(null);
+      }
+      clearThreadSelection();
+      setShowBulkActions(false);
+    } catch (err) {
+      alert('Failed to archive some threads');
+    }
+  }
+
   return (
     <div className="flex flex-col h-full">
       {/* Header with title and theme toggle */}
@@ -93,16 +147,53 @@ export function ThreadSidebar() {
           <span>{isCreating ? 'Creating...' : 'New Thread'}</span>
         </button>
 
-        {/* Show Archived toggle */}
-        <label className="flex items-center gap-2 text-sm cursor-pointer">
-          <input
-            type="checkbox"
-            checked={showArchived}
-            onChange={(e) => setShowArchived(e.target.checked)}
-            className="rounded border-gray-300 dark:border-slate-600"
-          />
-          <span className="text-gray-700 dark:text-slate-300">Show Archived</span>
-        </label>
+        {/* Bulk actions toggle and controls */}
+        <div className="flex items-center justify-between gap-2 mt-2">
+          <label className="flex items-center gap-2 text-sm cursor-pointer">
+            <input
+              type="checkbox"
+              checked={showArchived}
+              onChange={(e) => setShowArchived(e.target.checked)}
+              className="rounded border-gray-300 dark:border-slate-600"
+            />
+            <span className="text-gray-700 dark:text-slate-300">Archived</span>
+          </label>
+          
+          <button
+            onClick={() => {
+              setShowBulkActions(!showBulkActions);
+              if (showBulkActions) clearThreadSelection();
+            }}
+            className="text-xs px-2 py-1 rounded hover:bg-gray-100 dark:hover:bg-slate-700 text-gray-600 dark:text-slate-400 transition-colors"
+          >
+            {showBulkActions ? 'Cancel' : 'Select'}
+          </button>
+        </div>
+
+        {/* Bulk action buttons */}
+        {showBulkActions && selectedThreadIds.size > 0 && (
+          <div className="mt-2 space-y-2">
+            <div className="text-xs text-gray-600 dark:text-slate-400 text-center">
+              {selectedThreadIds.size} selected
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={handleBulkArchive}
+                className="flex-1 flex items-center justify-center gap-1 px-3 py-1.5 bg-yellow-600 hover:bg-yellow-700 text-white rounded text-xs transition-colors"
+              >
+                <Archive size={14} />
+                Archive
+              </button>
+              <button
+                onClick={handleBulkDelete}
+                className="flex-1 flex items-center justify-center gap-1 px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white rounded text-xs transition-colors"
+              >
+                <Trash2 size={14} />
+                Delete
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Error display */}
@@ -120,15 +211,39 @@ export function ThreadSidebar() {
           </div>
         ) : (
           <div className="py-2">
+            {/* Select All header (only shown in bulk mode) */}
+            {showBulkActions && (
+              <div className="px-4 py-2 flex items-center gap-2 border-b border-gray-200 dark:border-slate-700">
+                <button
+                  onClick={handleSelectAll}
+                  className="flex items-center gap-2 text-sm text-gray-600 dark:text-slate-400 hover:text-gray-900 dark:hover:text-slate-200"
+                >
+                  {selectedThreadIds.size === threads.length ? (
+                    <CheckSquare size={16} className="text-blue-600" />
+                  ) : (
+                    <Square size={16} />
+                  )}
+                  <span>Select All</span>
+                </button>
+              </div>
+            )}
+            
             {threads.map((thread) => (
               <ThreadItem
                 key={thread.id}
                 thread={thread}
                 isActive={thread.id === currentThreadId}
+                isSelected={selectedThreadIds.has(thread.id)}
+                showCheckbox={showBulkActions}
+                onToggleSelect={() => toggleThreadSelection(thread.id)}
                 onClick={() => {
-                  setCurrentThreadId(thread.id);
-                  // Reset context usage when switching threads (will update after first message)
-                  setContextUsage(0, defaultConfig.context_window ?? 30000);
+                  if (showBulkActions) {
+                    toggleThreadSelection(thread.id);
+                  } else {
+                    setCurrentThreadId(thread.id);
+                    // Reset context usage when switching threads (will update after first message)
+                    setContextUsage(0, defaultConfig.context_window ?? 30000);
+                  }
                 }}
               />
             ))}
@@ -146,10 +261,13 @@ export function ThreadSidebar() {
 interface ThreadItemProps {
   thread: Thread;
   isActive: boolean;
+  isSelected: boolean;
+  showCheckbox: boolean;
+  onToggleSelect: () => void;
   onClick: () => void;
 }
 
-function ThreadItem({ thread, isActive, onClick }: ThreadItemProps) {
+function ThreadItem({ thread, isActive, isSelected, showCheckbox, onToggleSelect, onClick }: ThreadItemProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [editTitle, setEditTitle] = useState(thread.title || '');
   const setThreads = useChatStore((s) => s.setThreads);
@@ -180,10 +298,29 @@ function ThreadItem({ thread, isActive, onClick }: ThreadItemProps) {
       className={`group ${
         isActive
           ? 'bg-blue-50 dark:bg-blue-900/20 border-l-4 border-blue-600'
+          : isSelected
+          ? 'bg-yellow-50 dark:bg-yellow-900/20 border-l-4 border-yellow-600'
           : 'hover:bg-gray-100 dark:hover:bg-slate-700/50 border-l-4 border-transparent'
       } w-full px-2 py-2 transition-colors ${isArchived ? 'opacity-60' : ''}`}
     >
       <div className="flex items-center gap-2">
+        {/* Checkbox for bulk selection */}
+        {showCheckbox && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onToggleSelect();
+            }}
+            className="flex-shrink-0"
+          >
+            {isSelected ? (
+              <CheckSquare size={18} className="text-blue-600" />
+            ) : (
+              <Square size={18} className="text-gray-400 dark:text-slate-500" />
+            )}
+          </button>
+        )}
+        
         <button onClick={onClick} className="flex items-center gap-3 flex-1 text-left min-w-0">
           <MessageSquare size={18} className="flex-shrink-0 text-gray-400 dark:text-slate-500" />
           {isEditing ? (
@@ -214,7 +351,7 @@ function ThreadItem({ thread, isActive, onClick }: ThreadItemProps) {
             </div>
           )}
         </button>
-        {!isEditing && (
+        {!isEditing && !showCheckbox && (
           <button
             title="Rename"
             onClick={(e) => {
@@ -226,7 +363,7 @@ function ThreadItem({ thread, isActive, onClick }: ThreadItemProps) {
             <Edit2 size={14} className="text-gray-500" />
           </button>
         )}
-        <ThreadActions threadId={thread.id} isArchived={isArchived} />
+        {!showCheckbox && <ThreadActions threadId={thread.id} isArchived={isArchived} />}
       </div>
     </div>
   );

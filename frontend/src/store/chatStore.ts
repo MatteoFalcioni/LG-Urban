@@ -63,6 +63,12 @@ interface ChatStore {
   setContextUsage: (tokensUsed: number, maxTokens: number) => void;
   isSummarizing: boolean;
   setIsSummarizing: (value: boolean) => void;
+
+  // Bulk selection for threads
+  selectedThreadIds: Set<string>;
+  toggleThreadSelection: (threadId: string) => void;
+  selectAllThreads: (threadIds: string[]) => void;
+  clearThreadSelection: () => void;
 }
 
 export const useChatStore = create<ChatStore>((set) => ({
@@ -146,5 +152,19 @@ export const useChatStore = create<ChatStore>((set) => ({
   setContextUsage: (tokensUsed, maxTokens) => set({ contextUsage: { tokensUsed, maxTokens } }),
   isSummarizing: false,
   setIsSummarizing: (value) => set({ isSummarizing: value }),
+
+  selectedThreadIds: new Set(),
+  toggleThreadSelection: (threadId) =>
+    set((state) => {
+      const newSelected = new Set(state.selectedThreadIds);
+      if (newSelected.has(threadId)) {
+        newSelected.delete(threadId);
+      } else {
+        newSelected.add(threadId);
+      }
+      return { selectedThreadIds: newSelected };
+    }),
+  selectAllThreads: (threadIds) => set({ selectedThreadIds: new Set(threadIds) }),
+  clearThreadSelection: () => set({ selectedThreadIds: new Set() }),
 }));
 
