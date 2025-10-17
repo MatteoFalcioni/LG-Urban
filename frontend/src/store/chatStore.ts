@@ -36,6 +36,7 @@ interface ChatStore {
   toolDrafts: { threadId: string; name: string; input?: any }[];
   addToolDraft: (threadId: string, name: string, input?: any) => void;
   removeToolDraft: (threadId: string, name: string) => void;
+  clearToolDrafts: (threadId: string) => void;
   
   // Artifact bubbles (separate from tool drafts, persistent)
   artifactBubbles: { threadId: string; toolName: string; artifacts: Artifact[] }[];
@@ -113,6 +114,8 @@ export const useChatStore = create<ChatStore>((set) => ({
     set((state) => ({ toolDrafts: [...state.toolDrafts, { threadId, name, input }] })),
   removeToolDraft: (threadId, name) =>
     set((state) => ({ toolDrafts: state.toolDrafts.filter((t) => !(t.threadId === threadId && t.name === name)) })),
+  clearToolDrafts: (threadId) =>
+    set((state) => ({ toolDrafts: state.toolDrafts.filter((t) => t.threadId !== threadId) })),
   
   artifactBubbles: [],
   addArtifactBubble: (threadId, toolName, artifacts) =>

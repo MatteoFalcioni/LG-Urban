@@ -14,6 +14,7 @@ export function MessageInput() {
   const currentThreadId = useChatStore((state) => state.currentThreadId);
   const setCurrentThreadId = useChatStore((state) => state.setCurrentThreadId);
   const addMessage = useChatStore((state) => state.addMessage);
+  const updateMessage = useChatStore((state) => state.updateMessage);
   const addThread = useChatStore((state) => state.addThread);
   const userId = useChatStore((state) => state.userId);
   const defaultConfig = useChatStore((state) => state.defaultConfig);
@@ -23,12 +24,12 @@ export function MessageInput() {
   const setThreads = useChatStore((state) => state.setThreads);
   const setContextUsage = useChatStore((state) => state.setContextUsage);
   const setIsSummarizing = useChatStore((state) => state.setIsSummarizing);
-  const setMessages = useChatStore((state) => state.setMessages);
   
   const [input, setInput] = useState('');
   const streamingRef = useRef(''); // Accumulate streaming tokens (mirror to avoid stale closure on onDone)
   const addToolDraft = useChatStore((state) => state.addToolDraft);
   const removeToolDraft = useChatStore((state) => state.removeToolDraft);
+  const clearToolDrafts = useChatStore((state) => state.clearToolDrafts);
   const addArtifactBubble = useChatStore((state) => state.addArtifactBubble);
   const clearArtifactBubbles = useChatStore((state) => state.clearArtifactBubbles);
   
@@ -87,25 +88,29 @@ export function MessageInput() {
       streamingRef.current = '';
       clearDraft();
       
-      // Refetch messages from DB to get artifacts properly linked
+      // Clear any remaining tool drafts (handles failed tools that didn't send tool_end)
       if (currentThreadId) {
-        console.log('Starting refetch process for thread:', currentThreadId);
-        // Delay to ensure backend has persisted everything and user can see the bubbles
+        clearToolDrafts(currentThreadId);
+      }
+      
+      // Smoothly update the assistant message with artifacts from DB
+      if (currentThreadId && messageId) {
+        // Short delay to ensure backend has persisted everything
         setTimeout(async () => {
           try {
-            console.log('Refetching messages for thread:', currentThreadId);
             const messages = await listMessages(currentThreadId);
-            console.log('Refetched messages:', messages.length, 'messages');
-            console.log('Messages with artifacts:', messages.filter(m => m.artifacts && m.artifacts.length > 0));
-            setMessages(messages.reverse());
-            // Clear artifact bubbles now that we have DB artifacts
+            // Find the assistant message we just added
+            const assistantMsg = messages.find(m => m.id === messageId);
+            if (assistantMsg && assistantMsg.artifacts && assistantMsg.artifacts.length > 0) {
+              // Update only this specific message with artifacts
+              updateMessage(messageId, { artifacts: assistantMsg.artifacts });
+            }
+            // Clear artifact bubbles now that artifacts are properly saved to DB
             clearArtifactBubbles(currentThreadId);
           } catch (err) {
-            console.error('Failed to refetch messages:', err);
+            console.error('Failed to update message with artifacts:', err);
           }
-        }, 2000); // 2 seconds gives user time to see the artifacts appear
-      } else {
-        console.log('No currentThreadId, skipping refetch');
+        }, 100); // Minimal delay for DB to persist
       }
     },
     onError: (error) => {
@@ -113,6 +118,11 @@ export function MessageInput() {
       alert(`Error: ${error}`);
       streamingRef.current = '';
       clearDraft();
+      
+      // Clear any hanging tool drafts when stream errors out
+      if (currentThreadId) {
+        clearToolDrafts(currentThreadId);
+      }
     },
   });
 
