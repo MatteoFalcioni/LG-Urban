@@ -85,6 +85,32 @@ def to_jsonable(value: Any) -> Any:
         return None
 
 
+def extract_text_from_content(content: Any) -> str:
+    """
+    Extract text from message content, handling both dict and list formats.
+    - Dict format: {'text': '...'} → returns the text
+    - List format: [{'text': '...', 'type': 'text'}] → returns text from first item
+    - String: returns as-is
+    - Other: returns string representation
+    """
+    if not content:
+        return ''
+    
+    # Dict format (OpenAI old style or normalized)
+    if isinstance(content, dict):
+        return content.get('text', str(content))
+    
+    # List format (Claude/new models)
+    if isinstance(content, list) and len(content) > 0:
+        first_item = content[0]
+        if isinstance(first_item, dict) and 'text' in first_item:
+            return first_item['text']
+        return str(content)
+    
+    # String or other
+    return str(content)
+
+
 @router.post("/threads", response_model=ThreadOut)
 async def create_thread(payload: ThreadCreate, session: AsyncSession = Depends(get_session)) -> ThreadOut:
     """
@@ -472,11 +498,18 @@ async def list_messages(
     # Build message outputs with artifacts
     message_outputs = []
     for msg in messages:
+        # Normalize content: Claude/newer models return list, but frontend expects dict
+        content = msg.content
+        if isinstance(content, list) and len(content) > 0:
+            # Extract text from list format: [{'text': '...', 'type': 'text'}]
+            if isinstance(content[0], dict) and 'text' in content[0]:
+                content = {"text": content[0]['text']}
+        
         msg_dict = {
             "id": msg.id,
             "thread_id": msg.thread_id,
             "role": msg.role,
-            "content": msg.content,
+            "content": content,
             "tool_name": msg.tool_name,
             "tool_input": msg.tool_input,
             "tool_output": msg.tool_output,
@@ -688,7 +721,10 @@ async def post_message_stream(
                         
                         chunk = event.get("data", {}).get("chunk")
                         if chunk and hasattr(chunk, "content") and chunk.content:
-                            yield f"data: {json.dumps({'type': 'token', 'content': chunk.content})}\n\n"
+                            # Extract text from chunk content (handle both string and list formats)
+                            chunk_text = extract_text_from_content(chunk.content)
+                            if chunk_text:
+                                yield f"data: {json.dumps({'type': 'token', 'content': chunk_text})}\n\n"
                     
                     # Detect summarization start
                     elif event_type == "on_chat_model_start" and checkpoint_ns.startswith("summarize_conversation:"):
@@ -838,7 +874,7 @@ async def post_message_stream(
                                 res = await title_sess.execute(stmt)
                                 messages = res.scalars().all()
                                 thread_text = "\n".join([
-                                    f"{m.role}: {m.content.get('text', str(m.content)) if m.content else ''}"
+                                    f"{m.role}: {extract_text_from_content(m.content)}"
                                     for m in messages
                                 ])
                                 llm = ChatOpenAI(model="gpt-4o-mini", temperature=0)
