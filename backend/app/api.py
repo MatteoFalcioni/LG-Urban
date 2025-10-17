@@ -402,6 +402,7 @@ async def list_messages(
     Only finalized messages are stored and returned (no partial tokens).
     Includes artifacts associated with each message via tool_call_id.
     """
+    print(f"=== ENTRY: list_messages called for thread_id={thread_id}, limit={limit} ===")
     from backend.db.models import Artifact
     from backend.artifacts.tokens import create_download_url
     
@@ -428,22 +429,43 @@ async def list_messages(
             "artifacts": [],
         }
         
-        # For assistant messages, look for artifacts from recent tool calls
+        # For assistant messages, look for artifacts from tool calls in the same conversational turn
+        # A "turn" is defined as all tool executions that happened immediately before this assistant response
         if msg.role == "assistant":
-            # Look backwards through messages to find the most recent tool message with artifacts
-            # We need to check all messages in this thread, not just the current batch
-            all_messages_stmt = (
+            print(f"=== DEBUG list_messages: Processing assistant message {msg.id} (created_at={msg.created_at}) ===")
+            # Find the most recent USER message before this assistant message
+            # This gives us the start of the current conversational turn
+            prev_user_stmt = (
+                select(Message.created_at)
+                .where(Message.thread_id == thread_id)
+                .where(Message.created_at < msg.created_at)
+                .where(Message.role == "user")
+                .order_by(Message.created_at.desc())
+                .limit(1)
+            )
+            prev_user_res = await session.execute(prev_user_stmt)
+            turn_start_time = prev_user_res.scalar_one_or_none()
+            
+            # Query for tool messages in this conversational turn (after the user message, up to and including this assistant message)
+            tool_msgs_stmt = (
                 select(Message)
                 .where(Message.thread_id == thread_id)
-                .where(Message.created_at <= msg.created_at)
                 .where(Message.role == "tool")
-                .order_by(Message.created_at.desc())
+                .where(Message.created_at <= msg.created_at)
             )
-            all_messages_res = await session.execute(all_messages_stmt)
-            recent_tool_messages = all_messages_res.scalars().all()
             
-            # Find the most recent tool message with artifacts
-            for tool_msg in recent_tool_messages:
+            if turn_start_time:
+                # Only get tool messages after the user message that started this turn
+                tool_msgs_stmt = tool_msgs_stmt.where(Message.created_at > turn_start_time)
+            
+            tool_msgs_stmt = tool_msgs_stmt.order_by(Message.created_at.desc())
+            tool_msgs_res = await session.execute(tool_msgs_stmt)
+            tool_messages = tool_msgs_res.scalars().all()
+            
+            print(f"=== DEBUG list_messages: Found {len(tool_messages)} tool messages for assistant message {msg.id} ===")
+            
+            # Collect artifacts from all tool calls in this turn
+            for tool_msg in tool_messages:
                 # Extract tool_call_id from tool_input (where it's actually stored)
                 tool_call_id = None
                 if isinstance(tool_msg.tool_input, dict):
@@ -457,27 +479,34 @@ async def list_messages(
                 if not tool_call_id and tool_msg.meta:
                     tool_call_id = tool_msg.meta.get("tool_call_id")
                 
+                print(f"=== DEBUG list_messages: Processing tool_msg {tool_msg.id}, tool_name={tool_msg.tool_name}, extracted tool_call_id={tool_call_id} ===")
+                print(f"=== DEBUG list_messages:   tool_input={tool_msg.tool_input} ===")
+                print(f"=== DEBUG list_messages:   Linking artifacts to assistant msg {msg.id} (created_at={msg.created_at}) ===")
+                
                 if tool_call_id:
                     # Query artifacts for this tool call
                     artifact_stmt = select(Artifact).where(Artifact.tool_call_id == tool_call_id)
                     artifact_res = await session.execute(artifact_stmt)
                     artifacts = artifact_res.scalars().all()
                     
-                    if artifacts:  # Only process if we found artifacts
-                        # Build artifact outputs with download URLs
-                        for artifact in artifacts:
-                            try:
-                                url = create_download_url(str(artifact.id))
-                                msg_dict["artifacts"].append({
-                                    "id": artifact.id,
-                                    "name": artifact.filename,
-                                    "mime": artifact.mime,
-                                    "size": artifact.size,
-                                    "url": url,
-                                })
-                            except Exception as e:
-                                print(f"Warning: Could not create URL for artifact {artifact.id}: {e}")
-                        break  # Found artifacts, stop looking
+                    print(f"=== DEBUG list_messages: Found {len(artifacts)} artifacts for tool_call_id={tool_call_id} ===")
+                    
+                    # Build artifact outputs with download URLs
+                    for artifact in artifacts:
+                        try:
+                            url = create_download_url(str(artifact.id))
+                            msg_dict["artifacts"].append({
+                                "id": artifact.id,
+                                "name": artifact.filename,
+                                "mime": artifact.mime,
+                                "size": artifact.size,
+                                "url": url,
+                            })
+                            print(f"=== DEBUG list_messages: Added artifact {artifact.id}/{artifact.filename} to assistant message {msg.id} ===")
+                        except Exception as e:
+                            print(f"=== WARNING: Could not create URL for artifact {artifact.id}: {e} ===")
+                else:
+                    print(f"=== DEBUG list_messages: No tool_call_id found for tool message {tool_msg.id} ===")
         
         message_outputs.append(MessageOut.model_validate(msg_dict))
     
@@ -556,18 +585,6 @@ async def post_message_stream(
         request_id = request.headers.get("x-request-id") or str(uuid.uuid4())
         assistant_content = None
         tool_calls = []  # Track tool calls for persistence
-
-        # Get context usage from graph state BEFORE streaming
-        try:
-            from backend.config import CONTEXT_WINDOW as DEFAULT_CONTEXT_WINDOW
-            state_snapshot = await graph.aget_state(config)
-            token_count = state_snapshot.values.get("token_count", 0) if state_snapshot.values else 0
-            # Use thread config context_window or env default
-            max_tokens = cfg.context_window if cfg and cfg.context_window else DEFAULT_CONTEXT_WINDOW
-            # Emit context update for frontend circle
-            yield f"data: {json.dumps({'type': 'context_update', 'tokens_used': token_count, 'max_tokens': max_tokens})}\n\n"
-        except Exception as e:
-            logging.warning(f"Failed to get state for context update: {e}")
         
         try:
             lock = get_thread_lock(str(thread_id))
@@ -581,6 +598,18 @@ async def post_message_stream(
                 state = {"messages": [{"role": "user", "content": user_text}]}
                 config = {"configurable": {"thread_id": str(thread_id)}}
                 
+                # Get context usage from graph state BEFORE streaming
+                try:
+                    from backend.config import CONTEXT_WINDOW as DEFAULT_CONTEXT_WINDOW
+                    state_snapshot = await graph.aget_state(config)
+                    token_count = state_snapshot.values.get("token_count", 0) if state_snapshot.values else 0
+                    # Use thread config context_window or env default
+                    max_tokens = cfg.context_window if cfg and cfg.context_window else DEFAULT_CONTEXT_WINDOW
+                    # Emit context update for frontend circle
+                    yield f"data: {json.dumps({'type': 'context_update', 'tokens_used': token_count, 'max_tokens': max_tokens})}\n\n"
+                except Exception as e:
+                    logging.warning(f"Failed to get state for context update: {e}")
+                
                 # Stream events from LangGraph
                 # We follow docs here: https://python.langchain.com/api_reference/core/language_models/langchain_core.language_models.chat_models.BaseChatModel.html?_gl=1*15ktatf*_gcl_au*MTc4MTgwMzA1Ny4xNzU4ODA2Mjcy*_ga*MTUzOTQwNjk3NS4xNzUwODY1MDM0*_ga_47WX3HKKY2*czE3NTk4MjY0Mzkkbzk5JGcxJHQxNzU5ODI2NTg0JGoxMyRsMCRoMA..#langchain_core.language_models.chat_models.BaseChatModel.astream_events
                 async for event in graph.astream_events(state, config, version="v2"):
@@ -589,6 +618,13 @@ async def post_message_stream(
                     event_meta = event.get("metadata", {})
                     node = event_meta.get("langgraph_node")
                     checkpoint_ns = event_meta.get("langgraph_checkpoint_ns", "")
+                    
+                    # Debug: log ALL events to see what we're getting
+                    if event_type in ["on_tool_start", "on_tool_end", "on_chat_model_stream"]:
+                        print(f"=== DEBUG post_message_stream: Received {event_type} event for {event_name} (node={node}) ===")
+                    
+                    if event_type in ["on_tool_start", "on_tool_end"]:
+                        print(f"=== DEBUG post_message_stream: Processing {event_type} event for {event_name} ===")
                     
                     # Stream token chunks from the LLM (but not from summarizer or its sub-calls)
                     if event_type == "on_chat_model_stream":
@@ -690,23 +726,31 @@ async def post_message_stream(
                 
                 # Persist using a short-lived session to avoid holding an open connection during SSE
                 a_msg_id = None
+                print(f"=== DEBUG post_message_stream: Persisting {len(tool_calls)} tool calls ===")
                 async with ASYNC_SESSION_MAKER() as write_sess:
                     # Tool messages first
                     for idx, tool_call in enumerate(tool_calls):
+                        print(f"=== DEBUG post_message_stream: Processing tool_call {idx}: {tool_call.get('name')} ===")
                         # Extract tool_call_id if available
                         tool_call_id = tool_call.get("id") or tool_call.get("tool_call_id")
+                        
+                        # Add tool_call_id to tool_input for easier retrieval
+                        tool_input = tool_call.get("input", {})
+                        if isinstance(tool_input, dict) and tool_call_id:
+                            tool_input = {**tool_input, "tool_call_id": tool_call_id}
                         
                         tool_msg = Message(
                             thread_id=t.id,
                             message_id=f"tool:{payload.message_id}:{idx}",
                             role="tool",
                             tool_name=tool_call["name"],
-                            tool_input=tool_call.get("input"),
+                            tool_input=tool_input,
                             tool_output=tool_call.get("output"),
                             content=None,
                             meta={"tool_call_id": tool_call_id} if tool_call_id else None,
                         )
                         write_sess.add(tool_msg)
+                        print(f"=== DEBUG post_message_stream: Added tool message {tool_msg.message_id} with tool_call_id={tool_call_id} ===")
 
                     # Assistant message
                     if assistant_content:

@@ -21,7 +21,7 @@ interface UseSSEOptions {
 
 export function useSSE(options: UseSSEOptions) {
   const [isStreaming, setIsStreaming] = useState(false);
-  const eventSourceRef = useRef<EventSource | null>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   /**
    * Send a message and stream the assistant response via SSE.
@@ -32,10 +32,14 @@ export function useSSE(options: UseSSEOptions) {
    */
   const sendMessage = useCallback(
     async (threadId: string, messageId: string, content: Record<string, any>) => {
-      // Close any existing stream
-      if (eventSourceRef.current) {
-        eventSourceRef.current.close();
+      // Abort any existing stream
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
       }
+
+      // Create new AbortController for this request
+      const abortController = new AbortController();
+      abortControllerRef.current = abortController;
 
       setIsStreaming(true);
 
@@ -49,6 +53,7 @@ export function useSSE(options: UseSSEOptions) {
             content,
             role: 'user',
           }),
+          signal: abortController.signal, // Add abort signal
         });
 
         if (!res.ok) {
@@ -105,8 +110,18 @@ export function useSSE(options: UseSSEOptions) {
           }
         }
       } catch (err) {
-        options.onError?.(err instanceof Error ? err.message : 'Stream failed');
+        // Don't treat abort as an error
+        if (err instanceof Error && err.name === 'AbortError') {
+          console.log('Stream aborted by user');
+        } else {
+          options.onError?.(err instanceof Error ? err.message : 'Stream failed');
+        }
         setIsStreaming(false);
+      } finally {
+        // Clean up abort controller reference
+        if (abortControllerRef.current === abortController) {
+          abortControllerRef.current = null;
+        }
       }
     },
     [options]
@@ -116,9 +131,9 @@ export function useSSE(options: UseSSEOptions) {
    * Cancel ongoing stream (if any).
    */
   const cancel = useCallback(() => {
-    if (eventSourceRef.current) {
-      eventSourceRef.current.close();
-      eventSourceRef.current = null;
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
     }
     setIsStreaming(false);
   }, []);

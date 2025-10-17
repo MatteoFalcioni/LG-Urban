@@ -4,7 +4,7 @@
  */
 
 import { useState, useRef } from 'react';
-import { Send, Loader2 } from 'lucide-react';
+import { Send, Square } from 'lucide-react';
 import { useChatStore } from '@/store/chatStore';
 import { useSSE } from '@/hooks/useSSE';
 import { createThread, updateThreadConfig, listMessages } from '@/utils/api';
@@ -33,7 +33,7 @@ export function MessageInput() {
   const clearArtifactBubbles = useChatStore((state) => state.clearArtifactBubbles);
   
   // SSE hook with handlers for streaming events
-  const { sendMessage, isStreaming } = useSSE({
+  const { sendMessage, isStreaming, cancel } = useSSE({
     onToken: (content) => {
       // Accumulate token chunks for assistant message
       streamingRef.current = streamingRef.current + content;
@@ -180,14 +180,31 @@ export function MessageInput() {
           className="flex-1 px-4 py-2 border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none disabled:opacity-50"
         />
 
-        {/* Send button */}
-        <button
-          type="submit"
-          disabled={!input.trim() || !currentThreadId || isStreaming}
-          className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 dark:disabled:bg-slate-700 text-white rounded-lg transition-colors flex items-center gap-2"
-        >
-          {isStreaming ? <Loader2 size={18} className="animate-spin" /> : <Send size={18} />}
-        </button>
+        {/* Send button (hidden when streaming) */}
+        {!isStreaming && (
+          <button
+            type="submit"
+            disabled={!input.trim() || !currentThreadId}
+            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 dark:disabled:bg-slate-700 text-white rounded-lg transition-colors flex items-center gap-2"
+          >
+            <Send size={18} />
+          </button>
+        )}
+
+        {/* Stop button (shown when streaming) */}
+        {isStreaming && (
+          <button
+            type="button"
+            onClick={() => {
+              cancel();
+              clearDraft();
+            }}
+            className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors flex items-center gap-2"
+            title="Stop generation"
+          >
+            <Square size={18} fill="currentColor" />
+          </button>
+        )}
       </div>
 
       {/* Inline typing now handled in MessageList; no bottom preview */}
