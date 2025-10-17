@@ -61,28 +61,30 @@ export function MessageList() {
 
   return (
     <div className="space-y-4">
-      {messages.map((msg, idx) => {
-        // For assistant messages, check if the previous message was a tool with artifacts
-        let toolArtifacts: typeof msg.artifacts = undefined;
-        if (msg.role === 'assistant' && idx > 0) {
-          const prevMsg = messages[idx - 1];
-          if (prevMsg.role === 'tool' && prevMsg.artifacts && prevMsg.artifacts.length > 0) {
-            toolArtifacts = prevMsg.artifacts;
+      {messages
+        .filter(msg => msg.role !== 'tool') // Hide tool messages from permanent display
+        .map((msg) => {
+          // For assistant messages, check if there were any tool messages before them with artifacts
+          let toolArtifacts: typeof msg.artifacts = undefined;
+          if (msg.role === 'assistant') {
+            // Look backwards through all messages to find the most recent tool message with artifacts
+            for (let i = messages.indexOf(msg) - 1; i >= 0; i--) {
+              const prevMsg = messages[i];
+              if (prevMsg.role === 'tool' && prevMsg.artifacts && prevMsg.artifacts.length > 0) {
+                toolArtifacts = prevMsg.artifacts;
+                break;
+              }
+            }
           }
-        }
-        // For tool messages, use their own artifacts
-        else if (msg.role === 'tool' && msg.artifacts && msg.artifacts.length > 0) {
-          toolArtifacts = msg.artifacts;
-        }
-        
-        return (
-          <MessageBubble 
-            key={msg.id} 
-            message={msg} 
-            toolArtifacts={toolArtifacts}
-          />
-        );
-      })}
+          
+          return (
+            <MessageBubble 
+              key={msg.id} 
+              message={msg} 
+              toolArtifacts={toolArtifacts}
+            />
+          );
+        })}
       {/* Inline typing bubble for assistant draft */}
       {streamingDraft && streamingDraft.threadId === currentThreadId && (
         <div className="flex gap-3 items-start">
@@ -167,42 +169,7 @@ function MessageBubble({ message, toolArtifacts }: MessageBubbleProps) {
   // Combine message's own artifacts with tool artifacts from previous message
   const allArtifacts = [...(artifacts || []), ...(toolArtifacts || [])];
 
-  // Tool messages: show with their artifacts
-  if (role === 'tool') {
-    return (
-      <div className="space-y-3">
-        <div className="flex gap-3 items-start">
-          <div className="w-8 h-8 rounded-full bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center flex-shrink-0">
-            <Wrench size={16} className="text-purple-600 dark:text-purple-400" />
-          </div>
-          <div className="flex-1 bg-purple-50 dark:bg-purple-900/10 border border-purple-200 dark:border-purple-800 rounded-lg p-3">
-            <div className="text-xs font-semibold text-purple-700 dark:text-purple-300 mb-1">
-              {message.tool_name || 'Tool'}
-            </div>
-            {message.tool_input && (
-              <div className="text-xs text-gray-700 dark:text-slate-300 mb-2">
-                {formatParams(message.tool_input)}
-              </div>
-            )}
-            {message.tool_output && (
-              <div className="text-xs text-gray-600 dark:text-slate-400">
-                {formatParams(message.tool_output)}
-              </div>
-            )}
-          </div>
-        </div>
-        {/* Show artifacts for tool messages */}
-        {allArtifacts && allArtifacts.length > 0 && (
-          <div className="flex gap-3 items-start">
-            <div className="w-8 h-8 flex-shrink-0" /> {/* Spacer to align with message */}
-            <div className="flex-1 max-w-2xl">
-              <ArtifactGrid artifacts={allArtifacts} />
-            </div>
-          </div>
-        )}
-      </div>
-    );
-  }
+  // Note: Tool messages are filtered out and not displayed in permanent chat
 
   // User message rendering
   if (role === 'user') {
