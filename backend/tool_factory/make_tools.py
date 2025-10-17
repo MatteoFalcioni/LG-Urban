@@ -305,8 +305,24 @@ def make_export_datasets_tool(
         """Export a file from container to host filesystem."""
         session_key = session_key_fn()
         
-        # Call the session manager's export method
-        result = session_manager.export_file(session_key, container_path)
+        # Get database session and thread_id from context (same as code_sandbox)
+        try:
+            from backend.graph.context import get_db_session, get_thread_id
+            db_session = get_db_session()
+            thread_id = get_thread_id()
+        except ImportError:
+            # Fallback if context module not available
+            db_session = None
+            thread_id = None
+        
+        # Call the session manager's export method with DB context for artifact persistence
+        result = await session_manager.export_file(
+            session_key, 
+            container_path,
+            db_session=db_session,
+            thread_id=thread_id,
+            tool_call_id=tool_call_id
+        )
         
         if result["success"]:
             # Create structured artifact for the exported file
