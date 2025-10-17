@@ -144,8 +144,14 @@ export function ConfigPanel() {
             onChange={(e) => setConfig({ ...config, model: e.target.value })}
             className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
-            <option value="gpt-4.1">GPT-4.1</option>
-            <option value="gpt-5">GPT-5</option>
+            <optgroup label="OpenAI">
+              <option value="gpt-4.1">GPT-4.1</option>
+              <option value="gpt-5">GPT-5</option>
+            </optgroup>
+            <optgroup label="Anthropic">
+              <option value="claude-sonnet-4-5">Claude Sonnet 4.5</option>
+              <option value="claude-haiku-4-5">Claude Haiku 4.5</option>
+            </optgroup>
           </select>
         </div>
 

@@ -82,6 +82,7 @@ def make_graph(model_name: str | None = None, temperature: float | None = None, 
             stream_usage=True  # NOTE: SUPER IMPORTANT WHEN USING `astream_events`! If we do not use it we do not get the usage metadata in last msg (with `astream` instead we do always)
         )
     elif model_name.startswith("claude-"):
+        #https://docs.claude.com/en/docs/about-claude/models/overview#model-names
         llm = ChatAnthropic(
             **llm_kwargs,
             stream_usage=True  # NOTE: SUPER IMPORTANT WHEN USING `astream_events`! If we do not use it we do not get the usage metadata in last msg (with `astream` instead we do always)

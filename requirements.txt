@@ -10,6 +10,7 @@ pytest
 pytest-asyncio
 langgraph
 langchain-openai
+langchain-anthropic
 langgraph-checkpoint-sqlite
 langchain-google-community
 docker
