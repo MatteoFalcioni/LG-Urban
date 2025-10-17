@@ -540,6 +540,18 @@ async def post_message_stream(
         request_id = request.headers.get("x-request-id") or str(uuid.uuid4())
         assistant_content = None
         tool_calls = []  # Track tool calls for persistence
+
+        # Get context usage from graph state BEFORE streaming
+        try:
+            from backend.config import CONTEXT_WINDOW as DEFAULT_CONTEXT_WINDOW
+            state_snapshot = await graph.aget_state(config)
+            token_count = state_snapshot.values.get("token_count", 0) if state_snapshot.values else 0
+            # Use thread config context_window or env default
+            max_tokens = cfg.context_window if cfg and cfg.context_window else DEFAULT_CONTEXT_WINDOW
+            # Emit context update for frontend circle
+            yield f"data: {json.dumps({'type': 'context_update', 'tokens_used': token_count, 'max_tokens': max_tokens})}\n\n"
+        except Exception as e:
+            logging.warning(f"Failed to get state for context update: {e}")
         
         try:
             lock = get_thread_lock(str(thread_id))
@@ -728,18 +740,6 @@ async def post_message_stream(
                                 yield f"data: {json.dumps({'type': 'title_updated', 'title': new_title})}\n\n"
                     except Exception as e:
                         logging.warning(f"Auto-title failed: {e}")
-
-                # Get context usage from graph state AFTER streaming completes
-                try:
-                    from backend.config import CONTEXT_WINDOW as DEFAULT_CONTEXT_WINDOW
-                    state_snapshot = await graph.aget_state(config)
-                    token_count = state_snapshot.values.get("token_count", 0) if state_snapshot.values else 0
-                    # Use thread config context_window or env default
-                    max_tokens = cfg.context_window if cfg and cfg.context_window else DEFAULT_CONTEXT_WINDOW
-                    # Emit context update for frontend circle
-                    yield f"data: {json.dumps({'type': 'context_update', 'tokens_used': token_count, 'max_tokens': max_tokens})}\n\n"
-                except Exception as e:
-                    logging.warning(f"Failed to get state for context update: {e}")
 
                 yield f"data: {json.dumps({'type': 'done', 'message_id': a_msg_id})}\n\n"
                     
