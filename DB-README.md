@@ -6,7 +6,7 @@ This app uses a **triple-store design** to separate concerns between persistent 
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                    LangGraph Application                     │
+│                    LangGraph Application                    │
 └─────────────────────────────────────────────────────────────┘
                     │           │           │
         ┌───────────┘           │           └───────────┐
@@ -14,12 +14,12 @@ This app uses a **triple-store design** to separate concerns between persistent 
         ▼                       ▼                       ▼
 ┌──────────────┐      ┌──────────────┐      ┌──────────────┐
 │   SQLite     │      │  PostgreSQL  │      │  Blobstore   │
-│              │      │              │      │  (Filesystem)│
+│              │      │              │      │ (Filesystem) │
 │ Checkpoints  │      │   Metadata   │      │              │
 │ Graph State  │      │   Messages   │      │ File Bytes   │
 │              │      │   Artifacts  │      │              │
 └──────────────┘      └──────────────┘      └──────────────┘
-  Ephemeral             Source of Truth       Content-Addressed
+   Ephemeral           Source of Truth      Content-Addressed
 ```
 
 ### Storage Responsibilities
@@ -54,20 +54,20 @@ This app uses a **triple-store design** to separate concerns between persistent 
          ├────────────────┴───────────────────┐
          │                                    │
          ▼                                    ▼
-┌──────────────────┐              ┌──────────────────┐
-│    messages      │              │     configs      │
-│──────────────────│              │──────────────────│
-│ id (PK)          │              │ thread_id (PK,FK)│
-│ thread_id (FK)   │              │ model            │
-│ message_id       │              │ temperature      │
-│ role             │              │ system_prompt    │
-│ content (JSONB)  │              │ context_window   │
-│ tool_name        │              │ settings (JSONB) │
-│ tool_input (JSONB)│             └──────────────────┘
+┌───────────────────┐              ┌──────────────────┐
+│    messages       │              │     configs      │
+│───────────────────│              │──────────────────│
+│ id (PK)           │              │ thread_id (PK,FK)│
+│ thread_id (FK)    │              │ model            │
+│ message_id        │              │ temperature      │
+│ role              │              │ system_prompt    │
+│ content (JSONB)   │              │ context_window   │
+│ tool_name         │              │ settings (JSONB) │
+│ tool_input (JSONB)│              └──────────────────┘
 │ tool_output(JSONB)│
-│ meta (JSONB)     │
-│ created_at       │
-└──────────────────┘
+│ meta (JSONB)      │
+│ created_at        │
+└───────────────────┘
          │
          │ 1:N
          ▼
@@ -210,7 +210,7 @@ filename = "report.pdf"
 - Agent state between steps
 - Graph control flow data
 
-**Important**: This is **ephemeral** data. Don't rely on it for persistence. If deleted, conversations continue from PostgreSQL message history.
+**Important**: This is **ephemeral** data. Don't rely on it for persistence. If deleted, conversations continue from PostgreSQL message history. But the agent will not have memory of previous chats, they will only be showed in frontend.
 
 ---
 
