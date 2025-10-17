@@ -2,6 +2,7 @@ from langgraph.types import Command
 from typing_extensions import Literal
 from langgraph.prebuilt import create_react_agent
 from langchain_openai import ChatOpenAI
+from langchain_anthropic import ChatAnthropic
 from langgraph.graph import StateGraph, START
 from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 from langchain_core.messages import SystemMessage, HumanMessage, RemoveMessage
@@ -29,7 +30,6 @@ from backend.graph.sit_tools import (
     view_3d_model,
 )
 from backend.graph.state import MyState
-from backend.config import CONTEXT_WINDOW
 
 
 load_dotenv()
@@ -60,7 +60,7 @@ def make_graph(model_name: str | None = None, temperature: float | None = None, 
     Create a graph with custom config. Reuses the same checkpointer for all invocations.
     
     Args:
-        model_name: OpenAI model name (e.g., "gpt-4o", "gpt-4o-mini")
+        model_name: OpenAI model name (e.g., "gpt-4.1"") or Anthropic model name (e.g., "claude-sonnet-4-5")
         temperature: Model temperature (0.0-2.0). If None, uses env DEFAULT_TEMPERATURE or model default.
         system_prompt: Custom system prompt. If None, uses default PROMPT.
         context_window: Custom context window. If None, uses env CONTEXT_WINDOW.
@@ -75,10 +75,16 @@ def make_graph(model_name: str | None = None, temperature: float | None = None, 
     temp = temperature if temperature is not None else DEFAULT_TEMPERATURE
     if temp is not None:
         llm_kwargs["temperature"] = temp
-    
-    llm = ChatOpenAI(
-        **llm_kwargs, 
-        stream_usage=True  # NOTE: SUPER IMPORTANT WHEN USING `astream_events`! If we do not use it we do not get the usage metadata in last msg (with `astream` instead we do always)
+
+    if model_name.startswith("gpt-"):
+        llm = ChatOpenAI(
+            **llm_kwargs,
+            stream_usage=True  # NOTE: SUPER IMPORTANT WHEN USING `astream_events`! If we do not use it we do not get the usage metadata in last msg (with `astream` instead we do always)
+        )
+    elif model_name.startswith("claude-"):
+        llm = ChatAnthropic(
+            **llm_kwargs,
+            stream_usage=True  # NOTE: SUPER IMPORTANT WHEN USING `astream_events`! If we do not use it we do not get the usage metadata in last msg (with `astream` instead we do always)
         )
     
     # Use default prompt, + custom prompt wrapped as SystemMessage
