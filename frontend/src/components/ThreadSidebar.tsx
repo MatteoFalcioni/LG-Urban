@@ -33,11 +33,10 @@ export function ThreadSidebar() {
   const [showBulkActions, setShowBulkActions] = useState(false);
 
   /**
-   * Cycle through theme options: light -> dark -> auto -> light
+   * Toggle between light and dark themes only
    */
   function toggleTheme() {
     if (theme === 'light') setTheme('dark');
-    else if (theme === 'dark') setTheme('auto');
     else setTheme('light');
   }
 

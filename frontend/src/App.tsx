@@ -4,7 +4,7 @@
  */
 
 import { useEffect, useRef, useState } from 'react';
-import { Settings } from 'lucide-react';
+import { Settings, Menu, MessageSquare } from 'lucide-react';
 import { useChatStore } from '@/store/chatStore';
 import { ThreadSidebar } from '@/components/ThreadSidebar';
 import { MessageList } from '@/components/MessageList';
@@ -82,6 +82,14 @@ function App() {
           style={{ width: sidebarWidth }}
         >
           <ThreadSidebar />
+          {/* Collapse button inside sidebar */}
+          <button
+            onClick={() => setIsSidebarCollapsed(true)}
+            className="absolute top-2 right-2 p-1.5 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg shadow-sm hover:bg-gray-50 dark:hover:bg-slate-700 transition-all duration-200 flex items-center justify-center"
+            title="Hide sidebar"
+          >
+            <Menu size={14} className="text-gray-600 dark:text-slate-400" />
+          </button>
           {/* Resize handle */}
           <div
             onMouseDown={handleResizeStart}
@@ -90,13 +98,16 @@ function App() {
         </aside>
       )}
 
-      {/* Collapse/expand button */}
-      <button
-        onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
-        className="fixed top-4 left-4 z-10 p-2 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg shadow-sm hover:bg-gray-50 dark:hover:bg-slate-700"
-      >
-        {isSidebarCollapsed ? '→' : '←'}
-      </button>
+      {/* Show sidebar button (only when collapsed) */}
+      {isSidebarCollapsed && (
+        <button
+          onClick={() => setIsSidebarCollapsed(false)}
+          className="fixed top-2 left-2 z-50 p-2 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg shadow-lg hover:bg-gray-50 dark:hover:bg-slate-700 transition-all duration-200 flex items-center justify-center"
+          title="Show sidebar"
+        >
+          <MessageSquare size={18} className="text-gray-600 dark:text-slate-400" />
+        </button>
+      )}
 
       {/* Main content: Messages */}
       <main className="flex-1 flex flex-col">
@@ -109,7 +120,7 @@ function App() {
           />
           <button
             onClick={toggleConfigPanel}
-            className="p-2 hover:bg-gray-100 dark:hover:bg-slate-700 rounded-lg transition-colors"
+            className="p-2 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg shadow-sm hover:bg-gray-50 dark:hover:bg-slate-700 transition-all duration-200 flex items-center justify-center"
             title={currentThreadId ? 'Thread Settings' : 'Default Settings'}
           >
             <Settings size={18} className="text-gray-600 dark:text-slate-400" />
