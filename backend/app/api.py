@@ -573,11 +573,11 @@ async def post_message_stream(
                             yield f"data: {json.dumps({'type': 'token', 'content': chunk.content})}\n\n"
                     
                     # Detect summarization start
-                    elif event_type == "on_chat_model_start" and node == "summarize_conversation":
+                    elif event_type == "on_chat_model_start" and checkpoint_ns.startswith("summarize_conversation:"):
                         yield f"data: {json.dumps({'type': 'summarizing', 'status': 'start'})}\n\n"
                     
                     # Detect summarization end
-                    elif event_type == "on_chat_model_end" and node == "summarize_conversation":
+                    elif event_type == "on_chat_model_end" and checkpoint_ns.startswith("summarize_conversation:"):
                         yield f"data: {json.dumps({'type': 'summarizing', 'status': 'done'})}\n\n"
                         # Emit context reset immediately after summarization (token_count is now 0)
                         from backend.config import CONTEXT_WINDOW as DEFAULT_CONTEXT_WINDOW
@@ -623,14 +623,14 @@ async def post_message_stream(
                             # Fallback to jsonable representation
                             tool_output_for_db = to_jsonable(raw_output)
                         
-                        # Extract tool_call_id from raw_output if available
+                        # Extract tool_call_id from raw_output (Command object)
                         tool_call_id = None
-                        if isinstance(raw_output, dict):
-                            # Check in the Command structure
-                            if "update" in raw_output and isinstance(raw_output["update"], dict):
-                                messages_update = raw_output["update"].get("messages", [])
-                                if messages_update and isinstance(messages_update[0], dict):
-                                    tool_call_id = messages_update[0].get("tool_call_id")
+                        if hasattr(raw_output, "update") and isinstance(raw_output.update, dict):
+                            messages = raw_output.update.get("messages", [])
+                            if messages and len(messages) > 0:
+                                tool_msg = messages[0]
+                                if hasattr(tool_msg, "tool_call_id"):
+                                    tool_call_id = tool_msg.tool_call_id
                         
                         tool_calls.append({
                             "name": event_name,
