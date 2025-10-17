@@ -428,40 +428,56 @@ async def list_messages(
             "artifacts": [],
         }
         
-        # If this is a tool message, fetch associated artifacts
-        if msg.role == "tool":
-            # Extract tool_call_id from tool_input (where it's actually stored)
-            tool_call_id = None
-            if isinstance(msg.tool_input, dict):
-                tool_call_id = msg.tool_input.get("tool_call_id")
+        # For assistant messages, look for artifacts from recent tool calls
+        if msg.role == "assistant":
+            # Look backwards through messages to find the most recent tool message with artifacts
+            # We need to check all messages in this thread, not just the current batch
+            all_messages_stmt = (
+                select(Message)
+                .where(Message.thread_id == thread_id)
+                .where(Message.created_at <= msg.created_at)
+                .where(Message.role == "tool")
+                .order_by(Message.created_at.desc())
+            )
+            all_messages_res = await session.execute(all_messages_stmt)
+            recent_tool_messages = all_messages_res.scalars().all()
             
-            # Fallback: check tool_output
-            if not tool_call_id and isinstance(msg.tool_output, dict):
-                tool_call_id = msg.tool_output.get("tool_call_id")
-            
-            # Also check meta field
-            if not tool_call_id and msg.meta:
-                tool_call_id = msg.meta.get("tool_call_id")
-            
-            if tool_call_id:
-                # Query artifacts for this tool call
-                artifact_stmt = select(Artifact).where(Artifact.tool_call_id == tool_call_id)
-                artifact_res = await session.execute(artifact_stmt)
-                artifacts = artifact_res.scalars().all()
+            # Find the most recent tool message with artifacts
+            for tool_msg in recent_tool_messages:
+                # Extract tool_call_id from tool_input (where it's actually stored)
+                tool_call_id = None
+                if isinstance(tool_msg.tool_input, dict):
+                    tool_call_id = tool_msg.tool_input.get("tool_call_id")
                 
-                # Build artifact outputs with download URLs
-                for artifact in artifacts:
-                    try:
-                        url = create_download_url(str(artifact.id))
-                        msg_dict["artifacts"].append({
-                            "id": artifact.id,
-                            "name": artifact.filename,
-                            "mime": artifact.mime,
-                            "size": artifact.size,
-                            "url": url,
-                        })
-                    except Exception as e:
-                        print(f"Warning: Could not create URL for artifact {artifact.id}: {e}")
+                # Fallback: check tool_output
+                if not tool_call_id and isinstance(tool_msg.tool_output, dict):
+                    tool_call_id = tool_msg.tool_output.get("tool_call_id")
+                
+                # Also check meta field
+                if not tool_call_id and tool_msg.meta:
+                    tool_call_id = tool_msg.meta.get("tool_call_id")
+                
+                if tool_call_id:
+                    # Query artifacts for this tool call
+                    artifact_stmt = select(Artifact).where(Artifact.tool_call_id == tool_call_id)
+                    artifact_res = await session.execute(artifact_stmt)
+                    artifacts = artifact_res.scalars().all()
+                    
+                    if artifacts:  # Only process if we found artifacts
+                        # Build artifact outputs with download URLs
+                        for artifact in artifacts:
+                            try:
+                                url = create_download_url(str(artifact.id))
+                                msg_dict["artifacts"].append({
+                                    "id": artifact.id,
+                                    "name": artifact.filename,
+                                    "mime": artifact.mime,
+                                    "size": artifact.size,
+                                    "url": url,
+                                })
+                            except Exception as e:
+                                print(f"Warning: Could not create URL for artifact {artifact.id}: {e}")
+                        break  # Found artifacts, stop looking
         
         message_outputs.append(MessageOut.model_validate(msg_dict))
     
