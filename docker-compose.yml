@@ -75,7 +75,7 @@ services:
       SESSION_STORAGE: TMPFS
       TMPFS_SIZE_MB: 1024
       DATASET_ACCESS: ${DATASET_ACCESS:-NONE}
-      HYBRID_LOCAL_PATH: /heavy_llm_data
+      HYBRID_LOCAL_PATH: ${HYBRID_LOCAL_PATH:-/home/matteo/LG-Urban/heavy_llm_data}
       BLOBSTORE_DIR: /app/blobstore
       SANDBOX_NETWORK: langgraph-network
       MAX_ARTIFACT_SIZE_MB: 50
