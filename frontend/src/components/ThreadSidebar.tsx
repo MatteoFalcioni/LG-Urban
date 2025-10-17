@@ -6,7 +6,7 @@
 import { useEffect, useState } from 'react';
 import { Plus, MessageSquare, Sun, Moon, Trash2, Archive, Edit2, CheckSquare, Square } from 'lucide-react';
 import { useChatStore } from '@/store/chatStore';
-import { createThread, listThreads, archiveThread, unarchiveThread, deleteThread, updateThreadTitle } from '@/utils/api';
+import { createThread, listThreads, archiveThread, unarchiveThread, deleteThread, updateThreadTitle, getThreadState } from '@/utils/api';
 import type { Thread } from '@/types/api';
 
 export function ThreadSidebar() {
@@ -236,13 +236,20 @@ export function ThreadSidebar() {
                 isSelected={selectedThreadIds.has(thread.id)}
                 showCheckbox={showBulkActions}
                 onToggleSelect={() => toggleThreadSelection(thread.id)}
-                onClick={() => {
+                onClick={async () => {
                   if (showBulkActions) {
                     toggleThreadSelection(thread.id);
                   } else {
                     setCurrentThreadId(thread.id);
-                    // Reset context usage when switching threads (will update after first message)
-                    setContextUsage(0, defaultConfig.context_window ?? 30000);
+                    // Fetch actual context usage from LangGraph state
+                    try {
+                      const state = await getThreadState(thread.id);
+                      setContextUsage(state.token_count, state.context_window);
+                    } catch (err) {
+                      console.error('Failed to fetch thread state:', err);
+                      // Fallback to default if fetch fails
+                      setContextUsage(0, defaultConfig.context_window ?? 30000);
+                    }
                   }
                 }}
               />

@@ -100,3 +100,11 @@ export async function updateThreadConfig(threadId: string, config: Partial<Threa
   return res.json();
 }
 
+// ===== Thread State =====
+
+export async function getThreadState(threadId: string): Promise<{ token_count: number; context_window: number }> {
+  const res = await fetch(`${BASE_URL}/threads/${threadId}/state`);
+  if (!res.ok) throw new Error(`Failed to get thread state: ${res.statusText}`);
+  return res.json();
+}
+

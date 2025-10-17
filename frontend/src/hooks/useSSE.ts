@@ -127,17 +127,6 @@ export function useSSE(options: UseSSEOptions) {
     [options]
   );
 
-  /**
-   * Cancel ongoing stream (if any).
-   */
-  const cancel = useCallback(() => {
-    if (abortControllerRef.current) {
-      abortControllerRef.current.abort();
-      abortControllerRef.current = null;
-    }
-    setIsStreaming(false);
-  }, []);
-
-  return { sendMessage, isStreaming, cancel };
+  return { sendMessage, isStreaming };
 }
 
