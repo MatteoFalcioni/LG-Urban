@@ -15,11 +15,38 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.db.session import get_session
-from backend.db.models import Thread, Message, Config
+from backend.db.models import Thread, Message, Config, UserAPIKeys
+from backend.utils.encryption import encrypt_api_key, decrypt_api_key, mask_api_key
 
 
 # API router for thread- and message-related endpoints, mounted under /api
 router = APIRouter()
+
+
+async def get_user_api_keys_for_llm(user_id: str, session: AsyncSession) -> dict | None:
+    """
+    Get user's API keys for LLM usage (raw, unencrypted).
+    Returns None if no keys are found.
+    """
+    try:
+        result = await session.execute(
+            select(UserAPIKeys).where(UserAPIKeys.user_id == user_id)
+        )
+        user_keys = result.scalar_one_or_none()
+        
+        if not user_keys:
+            return None
+        
+        keys = {}
+        if user_keys.openai_key:
+            keys['openai_key'] = decrypt_api_key(user_keys.openai_key)
+        if user_keys.anthropic_key:
+            keys['anthropic_key'] = decrypt_api_key(user_keys.anthropic_key)
+        
+        return keys if keys else None
+    except Exception as e:
+        print(f"Error getting user API keys: {e}")
+        return None
 
 
 # Request schema for creating a new thread
@@ -442,13 +469,17 @@ async def get_thread_state(
     if not _checkpointer_cm:
         raise HTTPException(status_code=500, detail="Checkpointer not initialized")
     
-    # Create graph with thread-specific config
+    # Get user API keys for LLM usage
+    user_api_keys = await get_user_api_keys_for_llm(t.user_id, session)
+    
+    # Create graph with thread-specific config and user API keys
     graph = make_graph(
         model_name=cfg.model if cfg else None,
         temperature=cfg.temperature if cfg else None,
         system_prompt=cfg.system_prompt if cfg else None,
         context_window=cfg.context_window if cfg else None,
         checkpointer=_checkpointer_cm[0],
+        user_api_keys=user_api_keys,
     )
     
     config = {"configurable": {"thread_id": str(thread_id)}}
@@ -660,13 +691,17 @@ async def post_message_stream(
             yield f"data: {json.dumps({'error': 'Checkpointer not initialized'})}\n\n"
             return
         
-        # Create graph with thread-specific config
+        # Get user API keys for LLM usage
+        user_api_keys = await get_user_api_keys_for_llm(t.user_id, session)
+        
+        # Create graph with thread-specific config and user API keys
         graph = make_graph(
             model_name=cfg.model if cfg else None,
             temperature=cfg.temperature if cfg else None,
             system_prompt=cfg.system_prompt if cfg else None,
             context_window=cfg.context_window if cfg else None,  # Use thread config or env default
             checkpointer=_checkpointer_cm[0],  # Reuse global checkpointer
+            user_api_keys=user_api_keys,
         )
 
         request_id = request.headers.get("x-request-id") or str(uuid.uuid4())
@@ -905,4 +940,91 @@ async def post_message_stream(
             yield f"data: {json.dumps({'type': 'error', 'error': str(e)})}\n\n"
 
     return StreamingResponse(event_stream(), media_type="text/event-stream")
+
+
+# API Key Management Endpoints
+
+class APIKeysRequest(BaseModel):
+    openai_key: Optional[str] = None
+    anthropic_key: Optional[str] = None
+
+
+class APIKeysResponse(BaseModel):
+    openai_key: Optional[str] = None  # Masked version
+    anthropic_key: Optional[str] = None  # Masked version
+
+
+@router.get("/users/{user_id}/api-keys", response_model=APIKeysResponse)
+async def get_user_api_keys(
+    user_id: str,
+    session: AsyncSession = Depends(get_session)
+):
+    """Get user's API keys (masked for security)."""
+    result = await session.execute(
+        select(UserAPIKeys).where(UserAPIKeys.user_id == user_id)
+    )
+    user_keys = result.scalar_one_or_none()
+    
+    if not user_keys:
+        return APIKeysResponse()
+    
+    return APIKeysResponse(
+        openai_key=mask_api_key(decrypt_api_key(user_keys.openai_key)) if user_keys.openai_key else None,
+        anthropic_key=mask_api_key(decrypt_api_key(user_keys.anthropic_key)) if user_keys.anthropic_key else None,
+    )
+
+
+@router.post("/users/{user_id}/api-keys", response_model=APIKeysResponse)
+async def save_user_api_keys(
+    user_id: str,
+    keys: APIKeysRequest,
+    session: AsyncSession = Depends(get_session)
+):
+    """Save or update user's API keys."""
+    # Get existing keys
+    result = await session.execute(
+        select(UserAPIKeys).where(UserAPIKeys.user_id == user_id)
+    )
+    user_keys = result.scalar_one_or_none()
+    
+    if not user_keys:
+        # Create new record
+        user_keys = UserAPIKeys(user_id=user_id)
+        session.add(user_keys)
+    
+    # Update keys (encrypt before storing)
+    if keys.openai_key is not None:
+        user_keys.openai_key = encrypt_api_key(keys.openai_key) if keys.openai_key else None
+    
+    if keys.anthropic_key is not None:
+        user_keys.anthropic_key = encrypt_api_key(keys.anthropic_key) if keys.anthropic_key else None
+    
+    await session.commit()
+    await session.refresh(user_keys)
+    
+    # Return masked versions
+    return APIKeysResponse(
+        openai_key=mask_api_key(decrypt_api_key(user_keys.openai_key)) if user_keys.openai_key else None,
+        anthropic_key=mask_api_key(decrypt_api_key(user_keys.anthropic_key)) if user_keys.anthropic_key else None,
+    )
+
+
+@router.get("/users/{user_id}/api-keys/raw")
+async def get_user_api_keys_raw(
+    user_id: str,
+    session: AsyncSession = Depends(get_session)
+):
+    """Get user's API keys in raw format (for internal use by LLM services)."""
+    result = await session.execute(
+        select(UserAPIKeys).where(UserAPIKeys.user_id == user_id)
+    )
+    user_keys = result.scalar_one_or_none()
+    
+    if not user_keys:
+        return {"openai_key": None, "anthropic_key": None}
+    
+    return {
+        "openai_key": decrypt_api_key(user_keys.openai_key) if user_keys.openai_key else None,
+        "anthropic_key": decrypt_api_key(user_keys.anthropic_key) if user_keys.anthropic_key else None,
+    }
 

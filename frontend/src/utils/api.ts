@@ -108,3 +108,28 @@ export async function getThreadState(threadId: string): Promise<{ token_count: n
   return res.json();
 }
 
+// ===== API Key Management =====
+
+export interface APIKeys {
+  openai_key?: string | null;
+  anthropic_key?: string | null;
+}
+
+export async function getUserApiKeys(userId: string): Promise<APIKeys> {
+  const res = await fetch(`${BASE_URL}/users/${userId}/api-keys`);
+  if (!res.ok) throw new Error(`Failed to get API keys: ${res.statusText}`);
+  return res.json();
+}
+
+export async function saveUserApiKeys(userId: string, keys: APIKeys): Promise<APIKeys> {
+  const res = await fetch(`${BASE_URL}/users/${userId}/api-keys`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(keys),
+  });
+  if (!res.ok) throw new Error(`Failed to save API keys: ${res.statusText}`);
+  return res.json();
+}
+

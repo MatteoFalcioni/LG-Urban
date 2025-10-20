@@ -6,6 +6,7 @@ from langchain_anthropic import ChatAnthropic
 from langgraph.graph import StateGraph, START
 from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 from langchain_core.messages import SystemMessage, HumanMessage, RemoveMessage
+from langchain_core.utils import SecretStr
 from dotenv import load_dotenv
 import os
 
@@ -55,7 +56,7 @@ async def get_checkpointer():
         raise ValueError("New style: direct object")
 
 
-def make_graph(model_name: str | None = None, temperature: float | None = None, system_prompt: str | None = None, context_window: int | None = None, checkpointer=None):
+def make_graph(model_name: str | None = None, temperature: float | None = None, system_prompt: str | None = None, context_window: int | None = None, checkpointer=None, user_api_keys: dict | None = None):
     """
     Create a graph with custom config. Reuses the same checkpointer for all invocations.
     
@@ -65,6 +66,7 @@ def make_graph(model_name: str | None = None, temperature: float | None = None, 
         system_prompt: Custom system prompt. If None, uses default PROMPT.
         context_window: Custom context window. If None, uses env CONTEXT_WINDOW.
         checkpointer: Reused checkpointer instance from app startup.
+        user_api_keys: Dict with 'openai_key' and 'anthropic_key' for user-provided API keys.
     """
     from backend.config import DEFAULT_MODEL, DEFAULT_TEMPERATURE, CONTEXT_WINDOW
     # Use config or fall back to env defaults
@@ -76,13 +78,32 @@ def make_graph(model_name: str | None = None, temperature: float | None = None, 
     if temp is not None:
         llm_kwargs["temperature"] = temp
 
+    # Use user API keys if available, otherwise fall back to environment variables
     if model_name.startswith("gpt-"):
+        api_key = None
+        if user_api_keys and user_api_keys.get('openai_key'):
+            api_key = user_api_keys['openai_key']
+        elif os.getenv('OPENAI_API_KEY'):
+            api_key = os.getenv('OPENAI_API_KEY')
+        
+        if api_key:
+            llm_kwargs['api_key'] = SecretStr(api_key)
+        
         llm = ChatOpenAI(
             **llm_kwargs,
             stream_usage=True  # NOTE: SUPER IMPORTANT WHEN USING `astream_events`! If we do not use it we do not get the usage metadata in last msg (with `astream` instead we do always)
         )
     elif model_name.startswith("claude-"):
         #https://docs.claude.com/en/docs/about-claude/models/overview#model-names
+        api_key = None
+        if user_api_keys and user_api_keys.get('anthropic_key'):
+            api_key = user_api_keys['anthropic_key']
+        elif os.getenv('ANTHROPIC_API_KEY'):
+            api_key = os.getenv('ANTHROPIC_API_KEY')
+        
+        if api_key:
+            llm_kwargs['api_key'] = SecretStr(api_key)
+        
         llm = ChatAnthropic(
             **llm_kwargs,
             stream_usage=True  # NOTE: SUPER IMPORTANT WHEN USING `astream_events`! If we do not use it we do not get the usage metadata in last msg (with `astream` instead we do always)
