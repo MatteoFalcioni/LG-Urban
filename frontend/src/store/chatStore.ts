@@ -141,7 +141,7 @@ export const useChatStore = create<ChatStore>((set) => ({
 
   sidebarWidth: parseInt(localStorage.getItem('sidebarWidth') || '256', 10),
   setSidebarWidth: (px) => {
-    const clamped = Math.max(220, Math.min(420, px));
+    const clamped = Math.max(220, Math.min(800, px));
     localStorage.setItem('sidebarWidth', String(clamped));
     set({ sidebarWidth: clamped });
   },

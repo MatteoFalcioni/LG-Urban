@@ -29,6 +29,10 @@ build/
 !env.template
 !sandbox.env.example
 
+# Encryption keys (never commit!)
+.encryption_key
+.encryption_key_data/
+
 # IDEs
 .vscode/
 .idea/

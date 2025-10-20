@@ -81,12 +81,14 @@ services:
       MAX_ARTIFACT_SIZE_MB: 50
       ARTIFACTS_SECRET: ${ARTIFACTS_SECRET:-fixed-secret-key-for-development}
       ARTIFACTS_TOKEN_TTL_SECONDS: ${ARTIFACTS_TOKEN_TTL_SECONDS:-86400}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY:-}
       CORS_ORIGINS: http://localhost,http://localhost:80
     ports:
       - "8000:8000"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock  # Allow backend to spawn sandbox containers
       - blobstore:/app/blobstore
+      - encryption_key:/app/.encryption_key_data  # Persist encryption key across restarts
       - sessions:/app/sessions
       - checkpoints:/app/checkpoints  # LangGraph SQLite checkpointer persistence
       - ./heavy_llm_data:/heavy_llm_data:ro  # Heavy datasets for HYBRID mode
@@ -138,6 +140,7 @@ volumes:
   blobstore:
   sessions:
   checkpoints:
+  encryption_key:
 
 networks:
   langgraph-network:

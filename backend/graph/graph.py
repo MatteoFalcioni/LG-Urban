@@ -6,7 +6,7 @@ from langchain_anthropic import ChatAnthropic
 from langgraph.graph import StateGraph, START
 from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 from langchain_core.messages import SystemMessage, HumanMessage, RemoveMessage
-from langchain_core.utils import SecretStr
+from pydantic import SecretStr
 from dotenv import load_dotenv
 import os
 

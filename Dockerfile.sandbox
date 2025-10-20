@@ -13,6 +13,8 @@ RUN pip install --no-cache-dir \
     scikit-learn \
     scikit-image \
     geopandas \
+    plotly \
+    seaborn \
     shapely \
     folium \
     pyarrow \
