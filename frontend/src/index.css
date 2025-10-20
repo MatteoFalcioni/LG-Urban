@@ -4,62 +4,62 @@
 
 /* Root CSS variables for theming */
 :root {
-  /* Light mode colors - modern, softer palette */
-  --bg-primary: #ffffff;
-  --bg-secondary: #f8fafc;
-  --bg-tertiary: #f1f5f9;
-  --text-primary: #0f172a;
-  --text-secondary: #64748b;
-  --text-tertiary: #94a3b8;
-  --border: #e2e8f0;
-  --border-light: #f1f5f9;
+  /* Light mode colors - Claude-inspired softer palette */
+  --bg-primary: #FAFAFA;
+  --bg-secondary: #F5F5F5;
+  --bg-tertiary: #F0F0F0;
+  --text-primary: #2D2D2D;
+  --text-secondary: #6B6B6B;
+  --text-tertiary: #9B9B9B;
+  --border: #E5E5E5;
+  --border-light: #F0F0F0;
   
-  /* Accent colors - modern blue palette */
-  --accent-50: #eff6ff;
-  --accent-100: #dbeafe;
-  --accent-500: #3b82f6;
-  --accent-600: #2563eb;
-  --accent-700: #1d4ed8;
+  /* Accent colors - softer blue palette */
+  --accent-50: #E8F2FF;
+  --accent-100: #D1E7FF;
+  --accent-500: #4A90E2;
+  --accent-600: #3A7BC8;
+  --accent-700: #2A5F9E;
   
-  /* Success colors */
-  --success-500: #10b981;
-  --success-600: #059669;
+  /* Success colors - softer */
+  --success-500: #22C55E;
+  --success-600: #16A34A;
   
-  /* Warning colors */
-  --warning-500: #f59e0b;
-  --warning-600: #d97706;
+  /* Warning colors - softer */
+  --warning-500: #F59E0B;
+  --warning-600: #D97706;
   
-  /* Error colors */
-  --error-500: #ef4444;
-  --error-600: #dc2626;
+  /* Error colors - softer */
+  --error-500: #EF4444;
+  --error-600: #DC2626;
   
-  /* Shadows */
-  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
-  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
-  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+  /* Shadows - gentler */
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.08);
+  --shadow-md: 0 2px 6px rgba(0, 0, 0, 0.12), 0 1px 2px rgba(0, 0, 0, 0.08);
+  --shadow-lg: 0 4px 12px rgba(0, 0, 0, 0.15), 0 2px 4px rgba(0, 0, 0, 0.1);
   
-  /* Border radius */
-  --radius-sm: 0.375rem;
-  --radius-md: 0.5rem;
-  --radius-lg: 0.75rem;
-  --radius-xl: 1rem;
+  /* Border radius - slightly larger */
+  --radius-sm: 0.5rem;
+  --radius-md: 0.75rem;
+  --radius-lg: 1rem;
+  --radius-xl: 1.25rem;
 }
 
-/* Dark mode overrides */
+/* Dark mode overrides - softer approach */
 .dark {
-  --bg-primary: #0f172a;
-  --bg-secondary: #1e293b;
-  --bg-tertiary: #334155;
-  --text-primary: #f8fafc;
-  --text-secondary: #cbd5e1;
-  --text-tertiary: #94a3b8;
-  --border: #334155;
-  --border-light: #475569;
+  --bg-primary: #1A1A1A;
+  --bg-secondary: #222222;
+  --bg-tertiary: #2A2A2A;
+  --text-primary: #E5E5E5;
+  --text-secondary: #B3B3B3;
+  --text-tertiary: #808080;
+  --border: #404040;
+  --border-light: #4A4A4A;
   
-  /* Dark mode shadows */
-  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.3);
-  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.3), 0 2px 4px -2px rgb(0 0 0 / 0.3);
-  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.3), 0 4px 6px -4px rgb(0 0 0 / 0.3);
+  /* Dark mode shadows - gentler */
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 2px 6px rgba(0, 0, 0, 0.4), 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-lg: 0 4px 12px rgba(0, 0, 0, 0.5), 0 2px 4px rgba(0, 0, 0, 0.4);
 }
 
 body {
@@ -152,8 +152,12 @@ body {
   box-shadow: 0 0 0 3px rgb(59 130 246 / 0.1);
 }
 
-/* Smooth transitions for theme changes */
+/* Smooth transitions for theme changes and interactions */
 * {
-  transition: background-color 0.2s ease-in-out, border-color 0.2s ease-in-out, color 0.2s ease-in-out;
+  transition: background-color 0.2s cubic-bezier(0.4, 0, 0.2, 1), 
+              border-color 0.2s cubic-bezier(0.4, 0, 0.2, 1), 
+              color 0.2s cubic-bezier(0.4, 0, 0.2, 1),
+              box-shadow 0.2s cubic-bezier(0.4, 0, 0.2, 1),
+              transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 

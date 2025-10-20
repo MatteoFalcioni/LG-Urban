@@ -130,11 +130,11 @@ export function ThreadSelector() {
             onClick={() => setIsOpen(!isOpen)}
             className="flex items-center gap-2 px-4 py-2 rounded-xl border border-gray-200 dark:border-slate-700 hover:bg-gray-50 dark:hover:bg-slate-700 transition-all duration-200 min-w-0 shadow-sm hover:shadow-md"
           >
-            <MessageSquare size={16} className="text-gray-600 dark:text-slate-400 flex-shrink-0" />
-            <span className="truncate text-sm font-medium text-gray-800 dark:text-slate-200">
+            <MessageSquare size={16} className="text-gray-500 dark:text-slate-400 flex-shrink-0" />
+            <span className="truncate text-sm font-medium text-gray-700 dark:text-slate-200">
               {currentThread?.title || 'Select a thread'}
             </span>
-            <ChevronDown size={14} className="text-gray-500 dark:text-slate-400 flex-shrink-0" />
+            <ChevronDown size={14} className="text-gray-400 dark:text-slate-500 flex-shrink-0" />
           </button>
         </div>
 
@@ -146,7 +146,7 @@ export function ThreadSelector() {
             className="p-2 rounded-xl border border-gray-200 dark:border-slate-700 hover:bg-gray-50 dark:hover:bg-slate-700 transition-all duration-200 disabled:opacity-50 shadow-sm hover:shadow-md"
             title="New Thread"
           >
-            <Plus size={16} className="text-gray-600 dark:text-slate-400" />
+            <Plus size={16} className="text-gray-500 dark:text-slate-400" />
           </button>
           
           <button
@@ -155,9 +155,9 @@ export function ThreadSelector() {
             title={`Theme: ${theme}`}
           >
             {theme === 'dark' ? (
-              <Moon size={16} className="text-gray-600 dark:text-slate-400" />
+              <Moon size={16} className="text-gray-500 dark:text-slate-400" />
             ) : (
-              <Sun size={16} className="text-gray-600 dark:text-slate-400" />
+              <Sun size={16} className="text-gray-500 dark:text-slate-400" />
             )}
           </button>
         </div>
@@ -201,48 +201,48 @@ export function ThreadSelector() {
                     </div>
                   ) : (
                     // Normal mode
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={() => handleSelectThread(thread.id)}
-                        className="flex-1 flex items-center gap-3 min-w-0"
-                      >
-                        <MessageSquare size={16} className="text-gray-400 dark:text-slate-500 flex-shrink-0" />
-                        <span className="truncate text-sm font-medium text-gray-800 dark:text-slate-200">
-                          {thread.title || 'Untitled'}
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => handleSelectThread(thread.id)}
+                      className="flex-1 flex items-center gap-3 min-w-0"
+                    >
+                      <MessageSquare size={16} className="text-gray-400 dark:text-slate-500 flex-shrink-0" />
+                      <span className="truncate text-sm font-medium text-gray-700 dark:text-slate-200">
+                        {thread.title || 'Untitled'}
+                      </span>
+                      {thread.archived_at && (
+                        <span className="text-xs px-2 py-1 bg-gray-100 dark:bg-slate-700 rounded-full flex-shrink-0 text-gray-600 dark:text-slate-300">
+                          Archived
                         </span>
-                        {thread.archived_at && (
-                          <span className="text-xs px-2 py-1 bg-gray-200 dark:bg-slate-700 rounded-full flex-shrink-0">
-                            Archived
-                          </span>
-                        )}
-                      </button>
+                      )}
+                    </button>
                       
                       {/* Action buttons - show on hover */}
                       <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                         <button
                           onClick={(e) => startEditingThread(thread.id, thread.title || '', e)}
-                          className="p-1 hover:bg-gray-200 dark:hover:bg-slate-600 rounded transition-colors"
+                          className="p-1 hover:bg-gray-100 dark:hover:bg-slate-600 rounded transition-colors"
                           title="Rename"
                         >
-                          <Pencil size={14} className="text-gray-500 dark:text-slate-400" />
+                          <Pencil size={14} className="text-gray-400 dark:text-slate-500" />
                         </button>
                         <button
                           onClick={(e) => handleToggleArchive(thread.id, !!thread.archived_at, e)}
-                          className="p-1 hover:bg-gray-200 dark:hover:bg-slate-600 rounded transition-colors"
+                          className="p-1 hover:bg-gray-100 dark:hover:bg-slate-600 rounded transition-colors"
                           title={thread.archived_at ? 'Unarchive' : 'Archive'}
                         >
                           {thread.archived_at ? (
-                            <ArchiveRestore size={14} className="text-gray-500 dark:text-slate-400" />
+                            <ArchiveRestore size={14} className="text-gray-400 dark:text-slate-500" />
                           ) : (
-                            <Archive size={14} className="text-gray-500 dark:text-slate-400" />
+                            <Archive size={14} className="text-gray-400 dark:text-slate-500" />
                           )}
                         </button>
                         <button
                           onClick={(e) => showDeleteConfirmation(thread.id, e)}
-                          className="p-1 hover:bg-red-100 dark:hover:bg-red-900/30 rounded transition-colors"
+                          className="p-1 hover:bg-red-50 dark:hover:bg-red-900/20 rounded transition-colors"
                           title="Delete"
                         >
-                          <Trash2 size={14} className="text-red-500 dark:text-red-400" />
+                          <Trash2 size={14} className="text-red-400 dark:text-red-400" />
                         </button>
                       </div>
                     </div>
@@ -257,7 +257,7 @@ export function ThreadSelector() {
             <button
               onClick={handleCreateThread}
               disabled={isCreating}
-              className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white rounded-xl transition-all duration-200 text-sm shadow-sm hover:shadow-md"
+              className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-blue-500 hover:bg-blue-600 disabled:bg-blue-400 text-white rounded-xl transition-all duration-200 text-sm shadow-sm hover:shadow-md"
             >
               <Plus size={16} />
               <span>{isCreating ? 'Creating...' : 'New Thread'}</span>

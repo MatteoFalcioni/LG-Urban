@@ -70,11 +70,11 @@ export function MessageList() {
       {/* Inline typing bubble for assistant draft */}
       {streamingDraft && streamingDraft.threadId === currentThreadId && (
         <div className="flex gap-3 items-start">
-          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-100 to-blue-200 dark:from-blue-900/30 dark:to-blue-800/30 flex items-center justify-center flex-shrink-0 shadow-sm">
-            <Bot size={16} className="text-blue-600 dark:text-blue-400" />
+          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-800/20 flex items-center justify-center flex-shrink-0 shadow-sm">
+            <Bot size={16} className="text-blue-500 dark:text-blue-400" />
           </div>
-          <div className="flex-1 max-w-2xl bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl p-4 shadow-sm">
-            <p className="text-sm whitespace-pre-wrap text-gray-800 dark:text-slate-200">{streamingDraft.text}</p>
+          <div className="flex-1 max-w-2xl bg-white dark:bg-slate-800 rounded-xl p-4 shadow-sm">
+            <p className="text-sm whitespace-pre-wrap text-gray-700 dark:text-slate-200">{streamingDraft.text}</p>
           </div>
         </div>
       )}
@@ -84,15 +84,15 @@ export function MessageList() {
         .filter((t) => t.threadId === currentThreadId)
         .map((t, idx) => (
           <div key={`tool-draft-${idx}-${t.name}`} className="flex gap-3 items-start">
-            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-100 to-purple-200 dark:from-purple-900/30 dark:to-purple-800/30 flex items-center justify-center flex-shrink-0 shadow-sm">
-              <Wrench size={16} className="text-purple-600 dark:text-purple-400 animate-spin" />
+            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-50 to-purple-100 dark:from-purple-900/20 dark:to-purple-800/20 flex items-center justify-center flex-shrink-0 shadow-sm">
+              <Wrench size={16} className="text-purple-500 dark:text-purple-400 animate-spin" />
             </div>
-            <div className="flex-1 bg-gradient-to-r from-purple-50 to-purple-100 dark:from-purple-900/10 dark:to-purple-800/10 border border-purple-200 dark:border-purple-800 rounded-xl p-4 shadow-sm">
-              <div className="text-xs font-semibold text-purple-700 dark:text-purple-300 mb-1">
+            <div className="flex-1 bg-gradient-to-r from-purple-50 to-purple-100 dark:from-purple-900/10 dark:to-purple-800/10 rounded-xl p-4 shadow-sm">
+              <div className="text-xs font-semibold text-purple-600 dark:text-purple-300 mb-1">
                 {t.name}
               </div>
               {t.input && (
-                <div className="text-xs text-gray-700 dark:text-slate-300">{formatParams(t.input)}</div>
+                <div className="text-xs text-gray-600 dark:text-slate-300">{formatParams(t.input)}</div>
               )}
             </div>
           </div>
@@ -138,13 +138,13 @@ function MessageBubble({ message }: MessageBubbleProps) {
   if (role === 'user') {
     return (
       <div className="flex gap-3 items-start justify-end">
-        <div className="flex-1 max-w-2xl bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-xl p-4 shadow-sm">
+        <div className="flex-1 max-w-2xl bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-xl p-4 shadow-sm">
           <p className="text-sm whitespace-pre-wrap leading-relaxed">
             {content?.text || JSON.stringify(content)}
           </p>
         </div>
-        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-100 to-blue-200 dark:from-blue-900/30 dark:to-blue-800/30 flex items-center justify-center flex-shrink-0 shadow-sm">
-          <User size={16} className="text-blue-600 dark:text-blue-400" />
+        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-800/20 flex items-center justify-center flex-shrink-0 shadow-sm">
+          <User size={16} className="text-blue-500 dark:text-blue-400" />
         </div>
       </div>
     );
@@ -154,11 +154,11 @@ function MessageBubble({ message }: MessageBubbleProps) {
   if (role === 'assistant') {
     return (
       <div className="flex gap-3 items-start">
-        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-gray-100 to-gray-200 dark:from-slate-700 dark:to-slate-600 flex items-center justify-center flex-shrink-0 shadow-sm">
-          <Bot size={16} className="text-gray-600 dark:text-slate-400" />
+        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-gray-50 to-gray-100 dark:from-slate-700 dark:to-slate-600 flex items-center justify-center flex-shrink-0 shadow-sm">
+          <Bot size={16} className="text-gray-500 dark:text-slate-400" />
         </div>
-        <div className="flex-1 max-w-2xl bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl p-4 shadow-sm">
-          <p className="text-sm whitespace-pre-wrap leading-relaxed text-gray-800 dark:text-slate-200">
+        <div className="flex-1 max-w-2xl bg-white dark:bg-slate-800 rounded-xl p-4 shadow-sm">
+          <p className="text-sm whitespace-pre-wrap leading-relaxed text-gray-700 dark:text-slate-200">
             {content?.text || JSON.stringify(content)}
           </p>
         </div>

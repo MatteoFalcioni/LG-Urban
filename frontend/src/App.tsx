@@ -64,7 +64,7 @@ function App() {
   }
 
   return (
-    <div className="flex h-screen bg-gray-50 dark:bg-slate-900 text-gray-900 dark:text-slate-100">
+    <div className="flex h-screen bg-gray-50 dark:bg-slate-900 text-gray-700 dark:text-slate-200">
       {/* Sidebar: Thread list (resizable/collapsible) */}
       {!isSidebarCollapsed && (
         <aside
@@ -78,12 +78,12 @@ function App() {
             className="absolute top-2 right-2 p-1.5 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg shadow-sm hover:bg-gray-50 dark:hover:bg-slate-700 transition-all duration-200 flex items-center justify-center"
             title="Hide sidebar"
           >
-            <Menu size={14} className="text-gray-600 dark:text-slate-400" />
+            <Menu size={14} className="text-gray-500 dark:text-slate-400" />
           </button>
           {/* Resize handle */}
           <div
             onMouseDown={handleResizeStart}
-            className="absolute top-0 right-0 w-2 h-full cursor-col-resize hover:bg-blue-500/20 bg-transparent"
+            className="absolute top-0 right-0 w-2 h-full cursor-col-resize hover:bg-blue-400/20 bg-transparent"
           />
         </aside>
       )}
@@ -95,7 +95,7 @@ function App() {
           className="fixed top-2 left-2 z-50 p-2 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg shadow-lg hover:bg-gray-50 dark:hover:bg-slate-700 transition-all duration-200 flex items-center justify-center"
           title="Show sidebar"
         >
-          <MessageSquare size={18} className="text-gray-600 dark:text-slate-400" />
+          <MessageSquare size={18} className="text-gray-500 dark:text-slate-400" />
         </button>
       )}
 
@@ -108,7 +108,7 @@ function App() {
             className="p-2 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg shadow-sm hover:bg-gray-50 dark:hover:bg-slate-700 transition-all duration-200 flex items-center justify-center"
             title={currentThreadId ? 'Thread Settings' : 'Default Settings'}
           >
-            <Settings size={18} className="text-gray-600 dark:text-slate-400" />
+            <Settings size={18} className="text-gray-500 dark:text-slate-400" />
           </button>
         </div>
         

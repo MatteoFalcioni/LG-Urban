@@ -44,8 +44,7 @@ async def get_user_api_keys_for_llm(user_id: str, session: AsyncSession) -> dict
             keys['anthropic_key'] = decrypt_api_key(user_keys.anthropic_key)
         
         return keys if keys else None
-    except Exception as e:
-        print(f"Error getting user API keys: {e}")
+    except Exception:
         return None
 
 
@@ -311,8 +310,20 @@ async def llm_update_thread_title(
     from langchain_openai import ChatOpenAI
     from langchain_core.prompts import ChatPromptTemplate
     from langchain_core.output_parsers import StrOutputParser
+    from pydantic import SecretStr
+    import os
     
-    llm = ChatOpenAI(model="gpt-4o-mini", temperature=0)
+    # Get user API keys
+    user_api_keys = await get_user_api_keys_for_llm(t.user_id, session)
+    
+    # Configure LLM with user's API key if available
+    llm_kwargs = {"model": "gpt-4o-mini", "temperature": 0}
+    if user_api_keys and user_api_keys.get('openai_key'):
+        llm_kwargs['api_key'] = SecretStr(user_api_keys['openai_key'])
+    elif os.getenv('OPENAI_API_KEY'):
+        llm_kwargs['api_key'] = SecretStr(os.getenv('OPENAI_API_KEY'))
+    
+    llm = ChatOpenAI(**llm_kwargs)
     prompt = ChatPromptTemplate.from_messages([
         ("system", "Return a concise, engaging title. No quotes, <= 8 words."),
         ("user", "Text:\n{body}\n\nTitle:")
@@ -513,7 +524,6 @@ async def list_messages(
     Only finalized messages are stored and returned (no partial tokens).
     Includes artifacts associated with each message via tool_call_id.
     """
-    print(f"=== ENTRY: list_messages called for thread_id={thread_id}, limit={limit} ===")
     from backend.db.models import Artifact
     from backend.artifacts.tokens import create_download_url
     
@@ -550,7 +560,6 @@ async def list_messages(
         # For assistant messages, look for artifacts from tool calls in the same conversational turn
         # A "turn" is defined as all tool executions that happened immediately before this assistant response
         if msg.role == "assistant":
-            print(f"=== DEBUG list_messages: Processing assistant message {msg.id} (created_at={msg.created_at}) ===")
             # Find the most recent USER message before this assistant message
             # This gives us the start of the current conversational turn
             prev_user_stmt = (
@@ -580,8 +589,6 @@ async def list_messages(
             tool_msgs_res = await session.execute(tool_msgs_stmt)
             tool_messages = tool_msgs_res.scalars().all()
             
-            print(f"=== DEBUG list_messages: Found {len(tool_messages)} tool messages for assistant message {msg.id} ===")
-            
             # Collect artifacts from all tool calls in this turn
             for tool_msg in tool_messages:
                 # Extract tool_call_id from tool_input (where it's actually stored)
@@ -597,17 +604,11 @@ async def list_messages(
                 if not tool_call_id and tool_msg.meta:
                     tool_call_id = tool_msg.meta.get("tool_call_id")
                 
-                print(f"=== DEBUG list_messages: Processing tool_msg {tool_msg.id}, tool_name={tool_msg.tool_name}, extracted tool_call_id={tool_call_id} ===")
-                print(f"=== DEBUG list_messages:   tool_input={tool_msg.tool_input} ===")
-                print(f"=== DEBUG list_messages:   Linking artifacts to assistant msg {msg.id} (created_at={msg.created_at}) ===")
-                
                 if tool_call_id:
                     # Query artifacts for this tool call
                     artifact_stmt = select(Artifact).where(Artifact.tool_call_id == tool_call_id)
                     artifact_res = await session.execute(artifact_stmt)
                     artifacts = artifact_res.scalars().all()
-                    
-                    print(f"=== DEBUG list_messages: Found {len(artifacts)} artifacts for tool_call_id={tool_call_id} ===")
                     
                     # Build artifact outputs with download URLs
                     for artifact in artifacts:
@@ -620,11 +621,8 @@ async def list_messages(
                                 "size": artifact.size,
                                 "url": url,
                             })
-                            print(f"=== DEBUG list_messages: Added artifact {artifact.id}/{artifact.filename} to assistant message {msg.id} ===")
-                        except Exception as e:
-                            print(f"=== WARNING: Could not create URL for artifact {artifact.id}: {e} ===")
-                else:
-                    print(f"=== DEBUG list_messages: No tool_call_id found for tool message {tool_msg.id} ===")
+                        except Exception:
+                            pass  # Skip artifacts that fail URL generation
         
         message_outputs.append(MessageOut.model_validate(msg_dict))
     
@@ -741,13 +739,6 @@ async def post_message_stream(
                     node = event_meta.get("langgraph_node")
                     checkpoint_ns = event_meta.get("langgraph_checkpoint_ns", "")
                     
-                    # Debug: log ALL events to see what we're getting
-                    if event_type in ["on_tool_start", "on_tool_end", "on_chat_model_stream"]:
-                        print(f"=== DEBUG post_message_stream: Received {event_type} event for {event_name} (node={node}) ===")
-                    
-                    if event_type in ["on_tool_start", "on_tool_end"]:
-                        print(f"=== DEBUG post_message_stream: Processing {event_type} event for {event_name} ===")
-                    
                     # Stream token chunks from the LLM (but not from summarizer or its sub-calls)
                     if event_type == "on_chat_model_stream":
                         # Skip if we're inside summarization context (agent called by summarizer)
@@ -851,11 +842,9 @@ async def post_message_stream(
                 
                 # Persist using a short-lived session to avoid holding an open connection during SSE
                 a_msg_id = None
-                print(f"=== DEBUG post_message_stream: Persisting {len(tool_calls)} tool calls ===")
                 async with ASYNC_SESSION_MAKER() as write_sess:
                     # Tool messages first
                     for idx, tool_call in enumerate(tool_calls):
-                        print(f"=== DEBUG post_message_stream: Processing tool_call {idx}: {tool_call.get('name')} ===")
                         # Extract tool_call_id if available
                         tool_call_id = tool_call.get("id") or tool_call.get("tool_call_id")
                         
@@ -875,7 +864,6 @@ async def post_message_stream(
                             meta={"tool_call_id": tool_call_id} if tool_call_id else None,
                         )
                         write_sess.add(tool_msg)
-                        print(f"=== DEBUG post_message_stream: Added tool message {tool_msg.message_id} with tool_call_id={tool_call_id} ===")
 
                     # Assistant message
                     if assistant_content:
@@ -912,7 +900,16 @@ async def post_message_stream(
                                     f"{m.role}: {extract_text_from_content(m.content)}"
                                     for m in messages
                                 ])
-                                llm = ChatOpenAI(model="gpt-4o-mini", temperature=0)
+                                # Configure LLM with user's API key if available
+                                from pydantic import SecretStr
+                                import os
+                                llm_kwargs = {"model": "gpt-4o-mini", "temperature": 0}
+                                if user_api_keys and user_api_keys.get('openai_key'):
+                                    llm_kwargs['api_key'] = SecretStr(user_api_keys['openai_key'])
+                                elif os.getenv('OPENAI_API_KEY'):
+                                    llm_kwargs['api_key'] = SecretStr(os.getenv('OPENAI_API_KEY'))
+                                
+                                llm = ChatOpenAI(**llm_kwargs)
                                 prompt = ChatPromptTemplate.from_messages([
                                     ("system", "Return a concise, engaging title. No quotes, <= 8 words."),
                                     ("user", "Text:\n{body}\n\nTitle:")

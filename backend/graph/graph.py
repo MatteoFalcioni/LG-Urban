@@ -43,9 +43,6 @@ async def get_checkpointer():
     Initialize checkpointer once at app startup (called from main.py lifespan).
     Returns the same checkpointer instance to be reused across all graph invocations.
     """
-    print(f"DEBUG: DB_PATH = {DB_PATH}")
-    print(f"DEBUG: DB_PATH exists = {os.path.exists(DB_PATH)}")
-    print(f"DEBUG: DB_PATH is file = {os.path.isfile(DB_PATH)}")
     cm_or_obj = AsyncSqliteSaver.from_conn_string(DB_PATH)
 
     # Old 0.2.x style: context manager (needs __aenter__/__aexit__)
@@ -150,8 +147,15 @@ def make_graph(model_name: str | None = None, temperature: float | None = None, 
     )
 
     # summarization agent
+    # Use same API key configuration as main LLM for gpt-4o-mini
+    summarizer_kwargs = {"model": "gpt-4o-mini", "temperature": 0.0}
+    if user_api_keys and user_api_keys.get('openai_key'):
+        summarizer_kwargs['api_key'] = SecretStr(user_api_keys['openai_key'])
+    elif os.getenv('OPENAI_API_KEY'):
+        summarizer_kwargs['api_key'] = SecretStr(os.getenv('OPENAI_API_KEY'))
+    
     agent_summarizer = create_react_agent(
-        model=ChatOpenAI(model="gpt-4o-mini", temperature=0.0),
+        model=ChatOpenAI(**summarizer_kwargs),
         tools=[],
         prompt="You are a helpful AI assistant that summarizes conversations.",  
         name="agent_summarizer",

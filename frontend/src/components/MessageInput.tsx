@@ -196,7 +196,7 @@ export function MessageInput() {
             placeholder={'Type a message...'}
             rows={1}
             disabled={isStreaming}
-            className="w-full px-4 py-3 pr-16 border border-gray-200 dark:border-slate-600 rounded-xl bg-gray-50 dark:bg-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none disabled:opacity-50 transition-all duration-200 text-sm placeholder-gray-500 dark:placeholder-slate-400"
+            className="w-full px-4 py-3 pr-16 border border-gray-200 dark:border-slate-600 rounded-xl bg-gray-50 dark:bg-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent resize-none disabled:opacity-50 transition-all duration-200 text-sm placeholder-gray-400 dark:placeholder-slate-500"
           />
           
           {/* Context indicator in bottom-right corner */}
@@ -214,7 +214,7 @@ export function MessageInput() {
           <button
             type="submit"
             disabled={!input.trim() || !currentThreadId}
-            className="px-4 py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 dark:disabled:bg-slate-600 text-white rounded-xl transition-all duration-200 flex items-center gap-2 shadow-sm hover:shadow-md disabled:shadow-none disabled:cursor-not-allowed"
+            className="px-4 py-3 bg-blue-500 hover:bg-blue-600 disabled:bg-gray-300 dark:disabled:bg-slate-600 text-white rounded-xl transition-all duration-200 flex items-center gap-2 shadow-sm hover:shadow-md disabled:shadow-none disabled:cursor-not-allowed"
           >
             <Send size={18} />
           </button>
