@@ -37,3 +37,4 @@ def downgrade() -> None:
     
     # Drop table
     op.drop_table('user_api_keys')
+

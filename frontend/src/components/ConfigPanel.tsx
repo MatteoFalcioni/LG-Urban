@@ -19,7 +19,6 @@ export function ConfigPanel() {
   const contextUsage = useChatStore((state) => state.contextUsage);
   const setContextUsage = useChatStore((state) => state.setContextUsage);
   const userId = useChatStore((state) => state.userId);
-  const apiKeys = useChatStore((state) => state.apiKeys);
   const setApiKeys = useChatStore((state) => state.setApiKeys);
 
   const [config, setConfig] = useState<ThreadConfig>({
@@ -89,11 +88,15 @@ export function ConfigPanel() {
     async function loadApiKeys() {
       try {
         const keys = await getUserApiKeys(userId);
-        setApiKeys(keys);
         // Set masked keys in inputs for display
         setApiKeyInputs({
           openai: keys.openai_key || '',
           anthropic: keys.anthropic_key || '',
+        });
+        // Update store with masked keys
+        setApiKeys({
+          openai: keys.openai_key || null,
+          anthropic: keys.anthropic_key || null,
         });
       } catch (err) {
         console.error('Failed to load API keys:', err);
@@ -155,7 +158,11 @@ export function ConfigPanel() {
       };
       
       const savedKeys = await saveUserApiKeys(userId, keysToSave);
-      setApiKeys(savedKeys);
+      // Update store with masked keys
+      setApiKeys({
+        openai: savedKeys.openai_key || null,
+        anthropic: savedKeys.anthropic_key || null,
+      });
       setKeysSaveStatus('success');
       setTimeout(() => setKeysSaveStatus('idle'), 2000);
     } catch (err) {

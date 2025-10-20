@@ -35,7 +35,6 @@ export function MessageInput() {
   const clearArtifactBubbles = useChatStore((state) => state.clearArtifactBubbles);
   const contextUsage = useChatStore((state) => state.contextUsage);
   const isSummarizing = useChatStore((state) => state.isSummarizing);
-  const defaultConfig = useChatStore((state) => state.defaultConfig);
   
   // Use context_window from defaultConfig if contextUsage.maxTokens is still default
   const effectiveMaxTokens = contextUsage.maxTokens === 30000 && defaultConfig.context_window 
