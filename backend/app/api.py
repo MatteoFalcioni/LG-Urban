@@ -921,7 +921,7 @@ async def post_message_stream(
                                 # Notify frontend of title update
                                 yield f"data: {json.dumps({'type': 'title_updated', 'title': new_title})}\n\n"
                     except Exception as e:
-                        logging.warning(f"Auto-title failed: {e}")
+                        logging.error(f"Auto-title failed for thread {t.id}: {e}", exc_info=True)
 
                 yield f"data: {json.dumps({'type': 'done', 'message_id': a_msg_id})}\n\n"
                     

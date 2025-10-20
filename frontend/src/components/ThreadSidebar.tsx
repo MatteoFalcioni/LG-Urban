@@ -8,6 +8,7 @@ import { Plus, MessageSquare, Sun, Moon, Trash2, Archive, Edit2, CheckSquare, Sq
 import { useChatStore } from '@/store/chatStore';
 import { createThread, listThreads, archiveThread, unarchiveThread, deleteThread, updateThreadTitle, getThreadState } from '@/utils/api';
 import type { Thread } from '@/types/api';
+import { AnimatedTitle } from './AnimatedTitle';
 
 export function ThreadSidebar() {
   const userId = useChatStore((state) => state.userId);
@@ -348,7 +349,11 @@ function ThreadItem({ thread, isActive, isSelected, showCheckbox, onToggleSelect
             />
           ) : (
             <div className="flex items-center gap-2 flex-1 min-w-0">
-              <span className="truncate text-sm font-medium">{thread.title || 'Untitled'}</span>
+              <AnimatedTitle 
+                title={thread.title || 'Untitled'} 
+                className="truncate text-sm font-medium"
+                duration={500}
+              />
               {isArchived && (
                 <span className="text-xs px-1.5 py-0.5 bg-gray-200 dark:bg-slate-700 rounded flex-shrink-0">
                   Archived

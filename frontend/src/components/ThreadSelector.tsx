@@ -3,10 +3,11 @@
  * Shows current thread title, dropdown for switching, and controls.
  */
 
-import { useState } from 'react';
-import { ChevronDown, Plus, Sun, Moon, MessageSquare, Pencil, Archive, ArchiveRestore, Trash2 } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { ChevronDown, Plus, Sun, Moon, MessageSquare, Pencil, Archive, ArchiveRestore, Trash2, CheckSquare, Square } from 'lucide-react';
 import { useChatStore } from '@/store/chatStore';
-import { createThread, updateThreadTitle, archiveThread, unarchiveThread, deleteThread } from '@/utils/api';
+import { createThread, updateThreadTitle, archiveThread, unarchiveThread, deleteThread, listThreads } from '@/utils/api';
+import { AnimatedTitle } from './AnimatedTitle';
 
 export function ThreadSelector() {
   const userId = useChatStore((state) => state.userId);
@@ -20,15 +21,35 @@ export function ThreadSelector() {
   const setTheme = useChatStore((state) => state.setTheme);
   const setContextUsage = useChatStore((state) => state.setContextUsage);
   const defaultConfig = useChatStore((state) => state.defaultConfig);
+  
+  // Bulk selection
+  const selectedThreadIds = useChatStore((state) => state.selectedThreadIds);
+  const toggleThreadSelection = useChatStore((state) => state.toggleThreadSelection);
+  const selectAllThreads = useChatStore((state) => state.selectAllThreads);
+  const clearThreadSelection = useChatStore((state) => state.clearThreadSelection);
 
   const [isOpen, setIsOpen] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
   const [editingThreadId, setEditingThreadId] = useState<string | null>(null);
   const [editingTitle, setEditingTitle] = useState('');
   const [deletingThreadId, setDeletingThreadId] = useState<string | null>(null);
+  const [bulkMode, setBulkMode] = useState(false);
 
   const currentThread = threads.find(t => t.id === currentThreadId);
   const deletingThread = threads.find(t => t.id === deletingThreadId);
+
+  // Fetch threads on mount
+  useEffect(() => {
+    async function loadThreads() {
+      try {
+        const fetchedThreads = await listThreads(userId, 50, false);
+        setThreads(fetchedThreads);
+      } catch (err) {
+        console.error('Failed to load threads:', err);
+      }
+    }
+    loadThreads();
+  }, [userId, setThreads]);
 
   /**
    * Toggle between light and dark themes only
@@ -120,6 +141,50 @@ export function ThreadSelector() {
     }
   }
 
+  // Bulk delete handler
+  async function handleBulkDelete() {
+    if (selectedThreadIds.size === 0) return;
+    if (!confirm(`Delete ${selectedThreadIds.size} thread(s)? This cannot be undone.`)) return;
+
+    try {
+      await Promise.all(Array.from(selectedThreadIds).map((id) => deleteThread(id)));
+      setThreads(threads.filter((t) => !selectedThreadIds.has(t.id)));
+      if (currentThreadId && selectedThreadIds.has(currentThreadId)) {
+        setCurrentThreadId(null);
+      }
+      clearThreadSelection();
+      setBulkMode(false);
+    } catch (err) {
+      alert('Failed to delete some threads');
+    }
+  }
+
+  // Bulk archive handler
+  async function handleBulkArchive() {
+    if (selectedThreadIds.size === 0) return;
+
+    try {
+      await Promise.all(Array.from(selectedThreadIds).map((id) => archiveThread(id)));
+      // Update threads to show as archived
+      setThreads(threads.map((t) => 
+        selectedThreadIds.has(t.id) ? { ...t, archived_at: new Date().toISOString() } : t
+      ));
+      clearThreadSelection();
+      setBulkMode(false);
+    } catch (err) {
+      alert('Failed to archive some threads');
+    }
+  }
+
+  // Toggle select all
+  function handleSelectAll() {
+    if (selectedThreadIds.size === threads.length) {
+      clearThreadSelection();
+    } else {
+      selectAllThreads(threads.map((t) => t.id));
+    }
+  }
+
   return (
     <div className="relative">
       {/* Top bar */}
@@ -131,9 +196,11 @@ export function ThreadSelector() {
             className="flex items-center gap-2 px-4 py-2 rounded-xl border border-gray-200 dark:border-slate-700 hover:bg-gray-50 dark:hover:bg-slate-700 transition-all duration-200 min-w-0 shadow-sm hover:shadow-md"
           >
             <MessageSquare size={16} className="text-gray-500 dark:text-slate-400 flex-shrink-0" />
-            <span className="truncate text-sm font-medium text-gray-700 dark:text-slate-200">
-              {currentThread?.title || 'Select a thread'}
-            </span>
+            <AnimatedTitle 
+              title={currentThread?.title || 'Select a thread'} 
+              className="truncate text-sm font-medium text-gray-700 dark:text-slate-200"
+              duration={600}
+            />
             <ChevronDown size={14} className="text-gray-400 dark:text-slate-500 flex-shrink-0" />
           </button>
         </div>
@@ -171,8 +238,66 @@ export function ThreadSelector() {
               No threads yet. Create one to start chatting!
             </div>
           ) : (
-            <div className="py-2">
-              {threads.map((thread) => (
+            <>
+              {/* Bulk action header */}
+              <div className="px-4 py-2 border-b border-gray-200 dark:border-slate-700 flex items-center justify-between">
+                {bulkMode ? (
+                  <>
+                    <button
+                      onClick={handleSelectAll}
+                      className="flex items-center gap-2 text-sm text-gray-600 dark:text-slate-400 hover:text-gray-900 dark:hover:text-slate-200"
+                    >
+                      {selectedThreadIds.size === threads.length ? (
+                        <CheckSquare size={16} className="text-blue-600" />
+                      ) : (
+                        <Square size={16} />
+                      )}
+                      <span>Select All ({selectedThreadIds.size}/{threads.length})</span>
+                    </button>
+                    <div className="flex items-center gap-2">
+                      {selectedThreadIds.size > 0 && (
+                        <>
+                          <button
+                            onClick={handleBulkArchive}
+                            className="px-2 py-1 text-xs bg-gray-100 dark:bg-slate-700 hover:bg-gray-200 dark:hover:bg-slate-600 rounded flex items-center gap-1"
+                            title="Archive selected"
+                          >
+                            <Archive size={12} />
+                            Archive
+                          </button>
+                          <button
+                            onClick={handleBulkDelete}
+                            className="px-2 py-1 text-xs bg-red-50 dark:bg-red-900/20 hover:bg-red-100 dark:hover:bg-red-900/30 text-red-600 dark:text-red-400 rounded flex items-center gap-1"
+                            title="Delete selected"
+                          >
+                            <Trash2 size={12} />
+                            Delete
+                          </button>
+                        </>
+                      )}
+                      <button
+                        onClick={() => {
+                          setBulkMode(false);
+                          clearThreadSelection();
+                        }}
+                        className="px-2 py-1 text-xs hover:bg-gray-100 dark:hover:bg-slate-700 rounded"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  <button
+                    onClick={() => setBulkMode(true)}
+                    className="text-sm text-blue-600 dark:text-blue-400 hover:underline"
+                  >
+                    Select Multiple
+                  </button>
+                )}
+              </div>
+              
+              <div className="py-2">
+                {threads.map((thread) => (
                 <div
                   key={thread.id}
                   className={`group relative px-4 py-3 hover:bg-gray-50 dark:hover:bg-slate-700 transition-all duration-200 ${
@@ -202,8 +327,23 @@ export function ThreadSelector() {
                   ) : (
                     // Normal mode
                   <div className="flex items-center gap-2">
+                    {bulkMode && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          toggleThreadSelection(thread.id);
+                        }}
+                        className="flex-shrink-0"
+                      >
+                        {selectedThreadIds.has(thread.id) ? (
+                          <CheckSquare size={16} className="text-blue-600" />
+                        ) : (
+                          <Square size={16} className="text-gray-400 dark:text-slate-500" />
+                        )}
+                      </button>
+                    )}
                     <button
-                      onClick={() => handleSelectThread(thread.id)}
+                      onClick={() => bulkMode ? toggleThreadSelection(thread.id) : handleSelectThread(thread.id)}
                       className="flex-1 flex items-center gap-3 min-w-0"
                     >
                       <MessageSquare size={16} className="text-gray-400 dark:text-slate-500 flex-shrink-0" />
@@ -217,9 +357,10 @@ export function ThreadSelector() {
                       )}
                     </button>
                       
-                      {/* Action buttons - show on hover */}
-                      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <button
+                      {/* Action buttons - show on hover (hide in bulk mode) */}
+                      {!bulkMode && (
+                        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <button
                           onClick={(e) => startEditingThread(thread.id, thread.title || '', e)}
                           className="p-1 hover:bg-gray-100 dark:hover:bg-slate-600 rounded transition-colors"
                           title="Rename"
@@ -244,12 +385,14 @@ export function ThreadSelector() {
                         >
                           <Trash2 size={14} className="text-red-400 dark:text-red-400" />
                         </button>
-                      </div>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
               ))}
-            </div>
+              </div>
+            </>
           )}
           
           {/* Create new thread button */}
@@ -257,7 +400,7 @@ export function ThreadSelector() {
             <button
               onClick={handleCreateThread}
               disabled={isCreating}
-              className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-blue-500 hover:bg-blue-600 disabled:bg-blue-400 text-white rounded-xl transition-all duration-200 text-sm shadow-sm hover:shadow-md"
+              className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-gray-800 hover:bg-gray-900 disabled:bg-gray-400 text-white rounded-xl transition-all duration-200 text-sm shadow-sm hover:shadow-md"
             >
               <Plus size={16} />
               <span>{isCreating ? 'Creating...' : 'New Thread'}</span>

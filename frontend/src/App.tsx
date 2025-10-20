@@ -83,7 +83,7 @@ function App() {
           {/* Resize handle */}
           <div
             onMouseDown={handleResizeStart}
-            className="absolute top-0 right-0 w-2 h-full cursor-col-resize hover:bg-blue-400/20 bg-transparent"
+            className="absolute top-0 right-0 w-2 h-full cursor-col-resize hover:bg-amber-400/20 bg-transparent"
           />
         </aside>
       )}

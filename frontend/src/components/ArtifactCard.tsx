@@ -37,55 +37,53 @@ export function ArtifactCard({ artifact }: ArtifactCardProps) {
   const isHtml = mime === 'text/html';
 
   return (
-    <div className="space-y-2">
-      {/* Image preview for image files */}
-      {isImage && (
-        <div className="rounded-lg overflow-hidden border border-gray-200 dark:border-slate-600">
+    <div className="flex flex-col space-y-2">
+      {/* Square artifact card with preview */}
+      <div className="aspect-square rounded-lg border border-gray-200 dark:border-slate-600 overflow-hidden bg-white dark:bg-slate-900">
+        {/* Preview content */}
+        {isImage ? (
           <img 
             src={url} 
             alt={name}
-            className="w-full h-auto max-h-96 object-contain bg-white dark:bg-slate-900"
+            className="w-full h-full object-contain"
           />
-        </div>
-      )}
-      
-      {/* HTML preview for HTML files */}
-      {isHtml && (
-        <div className="rounded-lg overflow-hidden border border-gray-200 dark:border-slate-600 bg-white dark:bg-slate-900">
+        ) : isHtml ? (
           <iframe
             src={url}
-            className="w-full h-96 border-0 bg-white"
+            className="w-full h-full border-0"
             title={name}
             sandbox="allow-scripts allow-same-origin"
           />
-        </div>
-      )}
+        ) : (
+          <div className="w-full h-full flex flex-col items-center justify-center p-4">
+            <div className="w-12 h-12 bg-gray-100 dark:bg-slate-800 rounded-lg flex items-center justify-center border border-gray-200 dark:border-slate-600 mb-3">
+              {getIconForMime(mime)}
+            </div>
+            <div className="text-center space-y-1">
+              <p className="text-sm font-medium text-gray-900 dark:text-white truncate" title={name}>
+                {name}
+              </p>
+              <p className="text-xs text-gray-500 dark:text-slate-400">
+                {mime}
+              </p>
+              <p className="text-xs text-gray-500 dark:text-slate-400">
+                {formatFileSize(size)}
+              </p>
+            </div>
+          </div>
+        )}
+      </div>
       
-      {/* File info and download */}
-      <div className="flex items-center gap-3 p-3 bg-gray-50 dark:bg-slate-700/50 border border-gray-200 dark:border-slate-600 rounded-lg hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors">
-        {/* Icon */}
-        <div className="flex-shrink-0 w-10 h-10 bg-white dark:bg-slate-800 rounded-lg flex items-center justify-center border border-gray-200 dark:border-slate-600">
-          {getIconForMime(mime)}
-        </div>
-
-        {/* File info */}
-        <div className="flex-1 min-w-0">
-          <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
-            {name}
-          </p>
-          <p className="text-xs text-gray-500 dark:text-slate-400">
-            {mime} · {formatFileSize(size)}
-          </p>
-        </div>
-
-        {/* Download button */}
+      {/* Download button inline below */}
+      <div className="flex justify-center">
         <a
           href={url}
           download={name}
-          className="flex-shrink-0 p-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
+          className="px-4 py-2 bg-gray-800 dark:bg-slate-700 text-white dark:text-slate-100 rounded-lg hover:bg-gray-700 dark:hover:bg-slate-600 transition-colors flex items-center space-x-2 text-sm font-medium"
           title={`Download ${name}`}
         >
           <Download size={16} />
+          <span>Download</span>
         </a>
       </div>
     </div>
@@ -105,11 +103,11 @@ export function ArtifactGrid({ artifacts }: ArtifactGridProps) {
   }
 
   return (
-    <div className="mt-3 space-y-2">
+    <div className="mt-3 space-y-4">
       <p className="text-xs font-semibold text-gray-500 dark:text-slate-400 uppercase tracking-wide">
         Generated Files ({artifacts.length})
       </p>
-      <div className="space-y-2">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
         {artifacts.map((artifact) => (
           <ArtifactCard key={artifact.id} artifact={artifact} />
         ))}

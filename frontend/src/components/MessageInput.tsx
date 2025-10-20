@@ -21,7 +21,6 @@ export function MessageInput() {
   const defaultConfig = useChatStore((state) => state.defaultConfig);
   const setDraft = useChatStore((state) => state.setStreamingDraft);
   const clearDraft = useChatStore((state) => state.clearStreamingDraft);
-  const threads = useChatStore((state) => state.threads);
   const setThreads = useChatStore((state) => state.setThreads);
   const setContextUsage = useChatStore((state) => state.setContextUsage);
   const setIsSummarizing = useChatStore((state) => state.setIsSummarizing);
@@ -67,7 +66,12 @@ export function MessageInput() {
     onTitleUpdated: (title) => {
       // Update thread title in sidebar when auto-title completes
       if (currentThreadId) {
-        setThreads(threads.map((t) => (t.id === currentThreadId ? { ...t, title } : t)));
+        // Get current threads from store to avoid stale closure
+        const currentThreads = useChatStore.getState().threads;
+        // Add a small delay to make the animation feel more natural
+        setTimeout(() => {
+          setThreads(currentThreads.map((t) => (t.id === currentThreadId ? { ...t, title } : t)));
+        }, 100);
       }
     },
     onContextUpdate: (tokensUsed, maxTokens) => {
@@ -179,7 +183,7 @@ export function MessageInput() {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="border-t border-gray-200 dark:border-slate-700 p-4 bg-white dark:bg-slate-800">
+    <form onSubmit={handleSubmit} className="border-t p-4" style={{ borderColor: 'var(--border)', backgroundColor: 'var(--bg-primary)' }}>
       <div className="flex gap-3 items-end">
         {/* Text input with context indicator */}
         <div className="flex-1 relative">
@@ -196,7 +200,12 @@ export function MessageInput() {
             placeholder={'Type a message...'}
             rows={1}
             disabled={isStreaming}
-            className="w-full px-4 py-3 pr-16 border border-gray-200 dark:border-slate-600 rounded-xl bg-gray-50 dark:bg-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent resize-none disabled:opacity-50 transition-all duration-200 text-sm placeholder-gray-400 dark:placeholder-slate-500"
+            className="w-full px-4 py-3 pr-16 rounded-xl focus:outline-none focus:ring-2 focus:border-transparent resize-none disabled:opacity-50 transition-all duration-200 text-sm"
+            style={{ 
+              border: '1px solid var(--border)', 
+              backgroundColor: 'var(--bg-secondary)', 
+              color: 'var(--text-primary)'
+            } as React.CSSProperties}
           />
           
           {/* Context indicator in bottom-right corner */}
@@ -214,7 +223,12 @@ export function MessageInput() {
           <button
             type="submit"
             disabled={!input.trim() || !currentThreadId}
-            className="px-4 py-3 bg-blue-500 hover:bg-blue-600 disabled:bg-gray-300 dark:disabled:bg-slate-600 text-white rounded-xl transition-all duration-200 flex items-center gap-2 shadow-sm hover:shadow-md disabled:shadow-none disabled:cursor-not-allowed"
+            className="px-4 py-3 rounded-xl transition-all duration-200 flex items-center gap-2 shadow-sm hover:shadow-md disabled:shadow-none disabled:cursor-not-allowed"
+            style={{ 
+              backgroundColor: 'var(--user-message-bg)', 
+              color: 'var(--user-message-text)',
+              opacity: (!input.trim() || !currentThreadId) ? 0.5 : 1
+            }}
           >
             <Send size={18} />
           </button>

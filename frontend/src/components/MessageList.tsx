@@ -70,11 +70,11 @@ export function MessageList() {
       {/* Inline typing bubble for assistant draft */}
       {streamingDraft && streamingDraft.threadId === currentThreadId && (
         <div className="flex gap-3 items-start">
-          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-800/20 flex items-center justify-center flex-shrink-0 shadow-sm">
-            <Bot size={16} className="text-blue-500 dark:text-blue-400" />
+          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-700 dark:to-gray-600 flex items-center justify-center flex-shrink-0 shadow-sm">
+            <Bot size={16} className="text-gray-600 dark:text-gray-300" />
           </div>
-          <div className="flex-1 max-w-2xl bg-white dark:bg-slate-800 rounded-xl p-4 shadow-sm">
-            <p className="text-sm whitespace-pre-wrap text-gray-700 dark:text-slate-200">{streamingDraft.text}</p>
+          <div className="flex-1 max-w-2xl rounded-xl p-4 shadow-sm" style={{ backgroundColor: 'var(--assistant-message-bg)', color: 'var(--assistant-message-text)' }}>
+            <p className="text-sm whitespace-pre-wrap">{streamingDraft.text}</p>
           </div>
         </div>
       )}
@@ -138,13 +138,13 @@ function MessageBubble({ message }: MessageBubbleProps) {
   if (role === 'user') {
     return (
       <div className="flex gap-3 items-start justify-end">
-        <div className="flex-1 max-w-2xl bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-xl p-4 shadow-sm">
+        <div className="flex-1 max-w-2xl rounded-xl p-4 shadow-sm" style={{ backgroundColor: 'var(--user-message-bg)', color: 'var(--user-message-text)' }}>
           <p className="text-sm whitespace-pre-wrap leading-relaxed">
             {content?.text || JSON.stringify(content)}
           </p>
         </div>
-        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-800/20 flex items-center justify-center flex-shrink-0 shadow-sm">
-          <User size={16} className="text-blue-500 dark:text-blue-400" />
+        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-700 dark:to-gray-600 flex items-center justify-center flex-shrink-0 shadow-sm">
+          <User size={16} className="text-gray-600 dark:text-gray-300" />
         </div>
       </div>
     );
@@ -154,11 +154,11 @@ function MessageBubble({ message }: MessageBubbleProps) {
   if (role === 'assistant') {
     return (
       <div className="flex gap-3 items-start">
-        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-gray-50 to-gray-100 dark:from-slate-700 dark:to-slate-600 flex items-center justify-center flex-shrink-0 shadow-sm">
-          <Bot size={16} className="text-gray-500 dark:text-slate-400" />
+        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-700 dark:to-gray-600 flex items-center justify-center flex-shrink-0 shadow-sm">
+          <Bot size={16} className="text-gray-600 dark:text-gray-300" />
         </div>
-        <div className="flex-1 max-w-2xl bg-white dark:bg-slate-800 rounded-xl p-4 shadow-sm">
-          <p className="text-sm whitespace-pre-wrap leading-relaxed text-gray-700 dark:text-slate-200">
+        <div className="flex-1 max-w-2xl rounded-xl p-4 shadow-sm" style={{ backgroundColor: 'var(--assistant-message-bg)', color: 'var(--assistant-message-text)' }}>
+          <p className="text-sm whitespace-pre-wrap leading-relaxed">
             {content?.text || JSON.stringify(content)}
           </p>
         </div>
