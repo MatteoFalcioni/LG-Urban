@@ -6,6 +6,7 @@
 import { useState, useRef } from 'react';
 import { Send } from 'lucide-react';
 import { useChatStore } from '@/store/chatStore';
+import { ContextIndicator } from './ContextIndicator';
 import { useSSE } from '@/hooks/useSSE';
 import { createThread, updateThreadConfig, listMessages } from '@/utils/api';
 import type { Message } from '@/types/api';
@@ -32,6 +33,14 @@ export function MessageInput() {
   const clearToolDrafts = useChatStore((state) => state.clearToolDrafts);
   const addArtifactBubble = useChatStore((state) => state.addArtifactBubble);
   const clearArtifactBubbles = useChatStore((state) => state.clearArtifactBubbles);
+  const contextUsage = useChatStore((state) => state.contextUsage);
+  const isSummarizing = useChatStore((state) => state.isSummarizing);
+  const defaultConfig = useChatStore((state) => state.defaultConfig);
+  
+  // Use context_window from defaultConfig if contextUsage.maxTokens is still default
+  const effectiveMaxTokens = contextUsage.maxTokens === 30000 && defaultConfig.context_window 
+    ? defaultConfig.context_window 
+    : contextUsage.maxTokens;
   
   // SSE hook with handlers for streaming events
   const { sendMessage, isStreaming } = useSSE({
@@ -171,31 +180,42 @@ export function MessageInput() {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="border-t border-gray-200 dark:border-slate-700 p-4">
-      <div className="flex gap-2 items-end">
-        {/* Text input */}
-        <textarea
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyDown={(e) => {
-            // Submit on Enter (not Shift+Enter)
-            if (e.key === 'Enter' && !e.shiftKey) {
-              e.preventDefault();
-              handleSubmit(e as any);
-            }
-          }}
-          placeholder={'Type a message...'}
-          rows={1}
-          disabled={isStreaming}
-          className="flex-1 px-4 py-2 border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none disabled:opacity-50"
-        />
+    <form onSubmit={handleSubmit} className="border-t border-gray-200 dark:border-slate-700 p-4 bg-white dark:bg-slate-800">
+      <div className="flex gap-3 items-end">
+        {/* Text input with context indicator */}
+        <div className="flex-1 relative">
+          <textarea
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={(e) => {
+              // Submit on Enter (not Shift+Enter)
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                handleSubmit(e as any);
+              }
+            }}
+            placeholder={'Type a message...'}
+            rows={1}
+            disabled={isStreaming}
+            className="w-full px-4 py-3 pr-16 border border-gray-200 dark:border-slate-600 rounded-xl bg-gray-50 dark:bg-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none disabled:opacity-50 transition-all duration-200 text-sm placeholder-gray-500 dark:placeholder-slate-400"
+          />
+          
+          {/* Context indicator in bottom-right corner */}
+          <div className="absolute bottom-3 right-3">
+            <ContextIndicator 
+              tokensUsed={contextUsage.tokensUsed}
+              maxTokens={effectiveMaxTokens}
+              isSummarizing={isSummarizing}
+            />
+          </div>
+        </div>
 
         {/* Send button (hidden when streaming) */}
         {!isStreaming && (
           <button
             type="submit"
             disabled={!input.trim() || !currentThreadId}
-            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 dark:disabled:bg-slate-700 text-white rounded-lg transition-colors flex items-center gap-2"
+            className="px-4 py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 dark:disabled:bg-slate-600 text-white rounded-xl transition-all duration-200 flex items-center gap-2 shadow-sm hover:shadow-md disabled:shadow-none disabled:cursor-not-allowed"
           >
             <Send size={18} />
           </button>

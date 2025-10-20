@@ -8,7 +8,6 @@ import { User, Bot, Wrench } from 'lucide-react';
 import { useChatStore } from '@/store/chatStore';
 import { listMessages } from '@/utils/api';
 import type { Message } from '@/types/api';
-import { ArtifactGrid } from './ArtifactCard';
 
 export function MessageList() {
   const currentThreadId = useChatStore((state) => state.currentThreadId);
@@ -60,39 +59,23 @@ export function MessageList() {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 p-4">
       {messages
         .filter(msg => msg.role !== 'tool') // Hide tool messages from permanent display
-        .map((msg) => {
-          // For assistant messages, check if there were any tool messages before them with artifacts
-          let toolArtifacts: typeof msg.artifacts = undefined;
-          if (msg.role === 'assistant') {
-            // Look backwards through all messages to find the most recent tool message with artifacts
-            for (let i = messages.indexOf(msg) - 1; i >= 0; i--) {
-              const prevMsg = messages[i];
-              if (prevMsg.role === 'tool' && prevMsg.artifacts && prevMsg.artifacts.length > 0) {
-                toolArtifacts = prevMsg.artifacts;
-                break;
-              }
-            }
-          }
-          
-          return (
-            <MessageBubble 
-              key={msg.id} 
-              message={msg} 
-              toolArtifacts={toolArtifacts}
-            />
-          );
-        })}
+        .map((msg) => (
+          <MessageBubble 
+            key={msg.id} 
+            message={msg} 
+          />
+        ))}
       {/* Inline typing bubble for assistant draft */}
       {streamingDraft && streamingDraft.threadId === currentThreadId && (
         <div className="flex gap-3 items-start">
-          <div className="w-8 h-8 rounded-full bg-gray-100 dark:bg-slate-700 flex items-center justify-center flex-shrink-0">
-            <Bot size={16} className="text-gray-600 dark:text-slate-400" />
+          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-100 to-blue-200 dark:from-blue-900/30 dark:to-blue-800/30 flex items-center justify-center flex-shrink-0 shadow-sm">
+            <Bot size={16} className="text-blue-600 dark:text-blue-400" />
           </div>
-          <div className="flex-1 max-w-2xl bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg p-3">
-            <p className="text-sm whitespace-pre-wrap">{streamingDraft.text}</p>
+          <div className="flex-1 max-w-2xl bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl p-4 shadow-sm">
+            <p className="text-sm whitespace-pre-wrap text-gray-800 dark:text-slate-200">{streamingDraft.text}</p>
           </div>
         </div>
       )}
@@ -102,10 +85,10 @@ export function MessageList() {
         .filter((t) => t.threadId === currentThreadId)
         .map((t, idx) => (
           <div key={`tool-draft-${idx}-${t.name}`} className="flex gap-3 items-start">
-            <div className="w-8 h-8 rounded-full bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center flex-shrink-0">
+            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-100 to-purple-200 dark:from-purple-900/30 dark:to-purple-800/30 flex items-center justify-center flex-shrink-0 shadow-sm">
               <Wrench size={16} className="text-purple-600 dark:text-purple-400 animate-spin" />
             </div>
-            <div className="flex-1 bg-purple-50 dark:bg-purple-900/10 border border-purple-200 dark:border-purple-800 rounded-lg p-3">
+            <div className="flex-1 bg-gradient-to-r from-purple-50 to-purple-100 dark:from-purple-900/10 dark:to-purple-800/10 border border-purple-200 dark:border-purple-800 rounded-xl p-4 shadow-sm">
               <div className="text-xs font-semibold text-purple-700 dark:text-purple-300 mb-1">
                 {t.name}
               </div>
@@ -116,21 +99,6 @@ export function MessageList() {
           </div>
         ))}
       
-      {/* Artifact bubbles - shown during streaming for immediate feedback */}
-      {artifactBubbles
-        .filter((a) => a.threadId === currentThreadId)
-        .map((a, idx) => (
-          <div key={`artifact-${idx}-${a.toolName}`} className="space-y-3">
-            <div className="flex gap-3 items-start">
-              <div className="w-8 h-8 rounded-full bg-gray-100 dark:bg-slate-700 flex items-center justify-center flex-shrink-0">
-                <Bot size={16} className="text-gray-600 dark:text-slate-400" />
-              </div>
-              <div className="flex-1 max-w-2xl">
-                <ArtifactGrid artifacts={a.artifacts} />
-              </div>
-            </div>
-          </div>
-        ))}
       {/* Invisible anchor for auto-scroll */}
       <div ref={messagesEndRef} />
     </div>
@@ -143,7 +111,6 @@ export function MessageList() {
  */
 interface MessageBubbleProps {
   message: Message;
-  toolArtifacts?: Message['artifacts'];
 }
 
 // Compact parameter formatter for tool inputs/outputs
@@ -163,11 +130,8 @@ function formatParams(value: any): string {
   }
 }
 
-function MessageBubble({ message, toolArtifacts }: MessageBubbleProps) {
-  const { role, content, artifacts } = message;
-  
-  // Combine message's own artifacts with tool artifacts from previous message
-  const allArtifacts = [...(artifacts || []), ...(toolArtifacts || [])];
+function MessageBubble({ message }: MessageBubbleProps) {
+  const { role, content } = message;
 
   // Note: Tool messages are filtered out and not displayed in permanent chat
 
@@ -175,12 +139,12 @@ function MessageBubble({ message, toolArtifacts }: MessageBubbleProps) {
   if (role === 'user') {
     return (
       <div className="flex gap-3 items-start justify-end">
-        <div className="flex-1 max-w-2xl bg-blue-600 text-white rounded-lg p-3">
-          <p className="text-sm whitespace-pre-wrap">
+        <div className="flex-1 max-w-2xl bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-xl p-4 shadow-sm">
+          <p className="text-sm whitespace-pre-wrap leading-relaxed">
             {content?.text || JSON.stringify(content)}
           </p>
         </div>
-        <div className="w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center flex-shrink-0">
+        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-100 to-blue-200 dark:from-blue-900/30 dark:to-blue-800/30 flex items-center justify-center flex-shrink-0 shadow-sm">
           <User size={16} className="text-blue-600 dark:text-blue-400" />
         </div>
       </div>
@@ -190,26 +154,15 @@ function MessageBubble({ message, toolArtifacts }: MessageBubbleProps) {
   // Assistant message rendering
   if (role === 'assistant') {
     return (
-      <div className="space-y-3">
-        <div className="flex gap-3 items-start">
-          <div className="w-8 h-8 rounded-full bg-gray-100 dark:bg-slate-700 flex items-center justify-center flex-shrink-0">
-            <Bot size={16} className="text-gray-600 dark:text-slate-400" />
-          </div>
-          <div className="flex-1 max-w-2xl bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg p-3">
-            <p className="text-sm whitespace-pre-wrap">
-              {content?.text || JSON.stringify(content)}
-            </p>
-          </div>
+      <div className="flex gap-3 items-start">
+        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-gray-100 to-gray-200 dark:from-slate-700 dark:to-slate-600 flex items-center justify-center flex-shrink-0 shadow-sm">
+          <Bot size={16} className="text-gray-600 dark:text-slate-400" />
         </div>
-        {/* Show artifacts if this message has them or if tool message before it had artifacts */}
-        {allArtifacts && allArtifacts.length > 0 && (
-          <div className="flex gap-3 items-start">
-            <div className="w-8 h-8 flex-shrink-0" /> {/* Spacer to align with message */}
-            <div className="flex-1 max-w-2xl">
-              <ArtifactGrid artifacts={allArtifacts} />
-            </div>
-          </div>
-        )}
+        <div className="flex-1 max-w-2xl bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl p-4 shadow-sm">
+          <p className="text-sm whitespace-pre-wrap leading-relaxed text-gray-800 dark:text-slate-200">
+            {content?.text || JSON.stringify(content)}
+          </p>
+        </div>
       </div>
     );
   }

@@ -70,6 +70,10 @@ interface ChatStore {
   toggleThreadSelection: (threadId: string) => void;
   selectAllThreads: (threadIds: string[]) => void;
   clearThreadSelection: () => void;
+
+  // API Keys
+  apiKeys: { openai: string | null; anthropic: string | null };
+  setApiKeys: (keys: { openai?: string | null; anthropic?: string | null }) => void;
 }
 
 export const useChatStore = create<ChatStore>((set) => ({
@@ -169,5 +173,12 @@ export const useChatStore = create<ChatStore>((set) => ({
     }),
   selectAllThreads: (threadIds) => set({ selectedThreadIds: new Set(threadIds) }),
   clearThreadSelection: () => set({ selectedThreadIds: new Set() }),
+
+  apiKeys: { openai: null, anthropic: null },
+  setApiKeys: (updates) => {
+    set((state) => ({
+      apiKeys: { ...state.apiKeys, ...updates }
+    }));
+  },
 }));
 

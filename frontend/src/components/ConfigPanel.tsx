@@ -5,9 +5,9 @@
  */
 
 import { useEffect, useState } from 'react';
-import { X, Save, Settings } from 'lucide-react';
+import { X, Save, Settings, Eye, EyeOff, Key } from 'lucide-react';
 import { useChatStore } from '@/store/chatStore';
-import { getDefaultConfig, getThreadConfig, updateThreadConfig } from '@/utils/api';
+import { getDefaultConfig, getThreadConfig, updateThreadConfig, getUserApiKeys, saveUserApiKeys } from '@/utils/api';
 import type { ThreadConfig } from '@/types/api';
 
 export function ConfigPanel() {
@@ -18,6 +18,9 @@ export function ConfigPanel() {
   const setDefaultConfig = useChatStore((state) => state.setDefaultConfig);
   const contextUsage = useChatStore((state) => state.contextUsage);
   const setContextUsage = useChatStore((state) => state.setContextUsage);
+  const userId = useChatStore((state) => state.userId);
+  const apiKeys = useChatStore((state) => state.apiKeys);
+  const setApiKeys = useChatStore((state) => state.setApiKeys);
 
   const [config, setConfig] = useState<ThreadConfig>({
     model: null,
@@ -28,6 +31,18 @@ export function ConfigPanel() {
   });
   const [isSaving, setIsSaving] = useState(false);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'success' | 'error'>('idle');
+  
+  // API Keys state
+  const [apiKeyInputs, setApiKeyInputs] = useState({
+    openai: '',
+    anthropic: '',
+  });
+  const [showKeys, setShowKeys] = useState({
+    openai: false,
+    anthropic: false,
+  });
+  const [isSavingKeys, setIsSavingKeys] = useState(false);
+  const [keysSaveStatus, setKeysSaveStatus] = useState<'idle' | 'success' | 'error'>('idle');
 
   // Load config when thread changes
   useEffect(() => {
@@ -69,6 +84,24 @@ export function ConfigPanel() {
     loadConfig();
   }, [currentThreadId]);
 
+  // Load API keys on mount
+  useEffect(() => {
+    async function loadApiKeys() {
+      try {
+        const keys = await getUserApiKeys(userId);
+        setApiKeys(keys);
+        // Set masked keys in inputs for display
+        setApiKeyInputs({
+          openai: keys.openai_key || '',
+          anthropic: keys.anthropic_key || '',
+        });
+      } catch (err) {
+        console.error('Failed to load API keys:', err);
+      }
+    }
+    loadApiKeys();
+  }, [userId, setApiKeys]);
+
   /**
    * Save config: thread-specific or default depending on selection
    */
@@ -105,6 +138,31 @@ export function ConfigPanel() {
       setSaveStatus('error');
     } finally {
       setIsSaving(false);
+    }
+  }
+
+  /**
+   * Save API keys
+   */
+  async function handleSaveApiKeys() {
+    setIsSavingKeys(true);
+    setKeysSaveStatus('idle');
+
+    try {
+      const keysToSave = {
+        openai_key: apiKeyInputs.openai || null,
+        anthropic_key: apiKeyInputs.anthropic || null,
+      };
+      
+      const savedKeys = await saveUserApiKeys(userId, keysToSave);
+      setApiKeys(savedKeys);
+      setKeysSaveStatus('success');
+      setTimeout(() => setKeysSaveStatus('idle'), 2000);
+    } catch (err) {
+      console.error('Failed to save API keys:', err);
+      setKeysSaveStatus('error');
+    } finally {
+      setIsSavingKeys(false);
     }
   }
 
@@ -204,6 +262,86 @@ export function ConfigPanel() {
             rows={6}
             className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none text-sm"
           />
+        </div>
+
+        {/* API Keys Section */}
+        <div className="border-t border-gray-200 dark:border-slate-700 pt-4">
+          <div className="flex items-center gap-2 mb-3">
+            <Key size={16} className="text-gray-600 dark:text-slate-400" />
+            <h3 className="text-sm font-medium">API Keys</h3>
+          </div>
+          
+          <p className="text-xs text-gray-600 dark:text-slate-400 mb-4">
+            Your API keys are encrypted and stored securely. They will be used for LLM requests.
+          </p>
+
+          {/* OpenAI API Key */}
+          <div className="mb-4">
+            <label className="block text-sm font-medium mb-1">OpenAI API Key</label>
+            <div className="relative">
+              <input
+                type={showKeys.openai ? 'text' : 'password'}
+                value={apiKeyInputs.openai}
+                onChange={(e) => setApiKeyInputs({ ...apiKeyInputs, openai: e.target.value })}
+                placeholder="sk-..."
+                className="w-full px-3 py-2 pr-10 border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+              />
+              <button
+                type="button"
+                onClick={() => setShowKeys({ ...showKeys, openai: !showKeys.openai })}
+                className="absolute right-2 top-1/2 transform -translate-y-1/2 p-1 hover:bg-gray-100 dark:hover:bg-slate-700 rounded"
+              >
+                {showKeys.openai ? (
+                  <EyeOff size={16} className="text-gray-500" />
+                ) : (
+                  <Eye size={16} className="text-gray-500" />
+                )}
+              </button>
+            </div>
+          </div>
+
+          {/* Anthropic API Key */}
+          <div className="mb-4">
+            <label className="block text-sm font-medium mb-1">Anthropic API Key</label>
+            <div className="relative">
+              <input
+                type={showKeys.anthropic ? 'text' : 'password'}
+                value={apiKeyInputs.anthropic}
+                onChange={(e) => setApiKeyInputs({ ...apiKeyInputs, anthropic: e.target.value })}
+                placeholder="sk-ant-..."
+                className="w-full px-3 py-2 pr-10 border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+              />
+              <button
+                type="button"
+                onClick={() => setShowKeys({ ...showKeys, anthropic: !showKeys.anthropic })}
+                className="absolute right-2 top-1/2 transform -translate-y-1/2 p-1 hover:bg-gray-100 dark:hover:bg-slate-700 rounded"
+              >
+                {showKeys.anthropic ? (
+                  <EyeOff size={16} className="text-gray-500" />
+                ) : (
+                  <Eye size={16} className="text-gray-500" />
+                )}
+              </button>
+            </div>
+          </div>
+
+          {/* Save API Keys Button */}
+          <button
+            onClick={handleSaveApiKeys}
+            disabled={isSavingKeys}
+            className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-300 dark:disabled:bg-slate-700 text-white rounded-lg transition-colors text-sm"
+          >
+            <Key size={16} />
+            <span>{isSavingKeys ? 'Saving...' : 'Save API Keys'}</span>
+          </button>
+          
+          {/* API Keys save status feedback */}
+          {keysSaveStatus === 'success' && (
+            <p className="text-xs text-green-600 dark:text-green-400 mt-2 text-center">✓ API keys saved successfully</p>
+          )}
+          {keysSaveStatus === 'error' && (
+            <p className="text-xs text-red-600 dark:text-red-400 mt-2 text-center">✗ Failed to save API keys</p>
+          )}
         </div>
       </div>
 

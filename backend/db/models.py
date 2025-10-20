@@ -26,6 +26,7 @@ from sqlalchemy import (
     text,
     Index,
     UniqueConstraint,
+    Text,
 )
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
@@ -157,6 +158,22 @@ class Artifact(Base):
     __table_args__ = (
         Index("ix_artifacts_thread_created", "thread_id", "created_at"),
         Index("ix_artifacts_sha256", "sha256"),
+    )
+
+
+class UserAPIKeys(Base):
+    __tablename__ = "user_api_keys"
+
+    user_id: Mapped[str] = mapped_column(String(255), primary_key=True, nullable=False, index=True)
+    # Encrypted API keys - stored as base64 encoded encrypted strings
+    openai_key: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    anthropic_key: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=text("NOW()")
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=text("NOW()"), server_onupdate=text("NOW()")
     )
 
 

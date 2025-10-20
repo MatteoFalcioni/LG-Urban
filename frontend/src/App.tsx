@@ -6,11 +6,9 @@
 import { useEffect, useRef, useState } from 'react';
 import { Settings, Menu, MessageSquare } from 'lucide-react';
 import { useChatStore } from '@/store/chatStore';
-import { ThreadSidebar } from '@/components/ThreadSidebar';
-import { MessageList } from '@/components/MessageList';
-import { MessageInput } from '@/components/MessageInput';
+import { ChatSidebar } from '@/components/ChatSidebar';
+import { ArtifactDisplay } from '@/components/ArtifactDisplay';
 import { ConfigPanel } from '@/components/ConfigPanel';
-import { ContextIndicator } from '@/components/ContextIndicator';
 
 function App() {
   const theme = useChatStore((state) => state.theme);
@@ -18,14 +16,6 @@ function App() {
   const toggleConfigPanel = useChatStore((state) => state.toggleConfigPanel);
   const sidebarWidth = useChatStore((s) => s.sidebarWidth);
   const setSidebarWidth = useChatStore((s) => s.setSidebarWidth);
-  const contextUsage = useChatStore((s) => s.contextUsage);
-  const isSummarizing = useChatStore((s) => s.isSummarizing);
-  const defaultConfig = useChatStore((s) => s.defaultConfig);
-  
-  // Use context_window from defaultConfig if contextUsage.maxTokens is still default
-  const effectiveMaxTokens = contextUsage.maxTokens === 30000 && defaultConfig.context_window 
-    ? defaultConfig.context_window 
-    : contextUsage.maxTokens;
   const isResizing = useRef(false);
   const startWidth = useRef(0);
   const startX = useRef(0);
@@ -81,7 +71,7 @@ function App() {
           className="bg-white dark:bg-slate-800 border-r border-gray-200 dark:border-slate-700 relative"
           style={{ width: sidebarWidth }}
         >
-          <ThreadSidebar />
+          <ChatSidebar />
           {/* Collapse button inside sidebar */}
           <button
             onClick={() => setIsSidebarCollapsed(true)}
@@ -109,15 +99,10 @@ function App() {
         </button>
       )}
 
-      {/* Main content: Messages */}
+      {/* Main content: Artifact Display */}
       <main className="flex-1 flex flex-col">
-        {/* Header with context indicator and config toggle */}
-        <div className="flex items-center justify-between p-2 border-b border-gray-200 dark:border-slate-700">
-          <ContextIndicator 
-            tokensUsed={contextUsage.tokensUsed}
-            maxTokens={effectiveMaxTokens}
-            isSummarizing={isSummarizing}
-          />
+        {/* Header with config toggle */}
+        <div className="flex items-center justify-end p-2 border-b border-gray-200 dark:border-slate-700">
           <button
             onClick={toggleConfigPanel}
             className="p-2 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg shadow-sm hover:bg-gray-50 dark:hover:bg-slate-700 transition-all duration-200 flex items-center justify-center"
@@ -127,12 +112,8 @@ function App() {
           </button>
         </div>
         
-        <div className="flex-1 overflow-auto p-6">
-          <MessageList />
-        </div>
-        
-        {/* Message input with streaming support */}
-        <MessageInput />
+        {/* Artifact display area */}
+        <ArtifactDisplay />
       </main>
 
       {/* Right panel: Config (toggleable) */}
