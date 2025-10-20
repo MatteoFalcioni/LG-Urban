@@ -76,3 +76,4 @@ def mask_api_key(api_key: str) -> str:
     else:
         # Generic masking
         return f"{api_key[:4]}...{api_key[-4:]}"
+

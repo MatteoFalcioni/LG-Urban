@@ -16,7 +16,6 @@ export function MessageList() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const streamingDraft = useChatStore((state) => state.streamingDraft);
   const toolDrafts = useChatStore((state) => state.toolDrafts);
-  const artifactBubbles = useChatStore((state) => state.artifactBubbles);
 
   // Fetch messages when thread changes
   useEffect(() => {
