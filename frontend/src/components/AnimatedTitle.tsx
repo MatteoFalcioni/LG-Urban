@@ -11,7 +11,7 @@ interface AnimatedTitleProps {
   duration?: number; // Animation duration in milliseconds
 }
 
-export function AnimatedTitle({ title, className = '', duration = 800 }: AnimatedTitleProps) {
+export function AnimatedTitle({ title, className = '', duration = 400 }: AnimatedTitleProps) {
   const [displayedTitle, setDisplayedTitle] = useState(title);
   const [isAnimating, setIsAnimating] = useState(false);
   const previousTitleRef = useRef(title);
@@ -27,16 +27,16 @@ export function AnimatedTitle({ title, className = '', duration = 800 }: Animate
         clearTimeout(timeoutRef.current);
       }
 
-      // Start the animation sequence
+      // Much faster animation - update immediately with shorter transition
       timeoutRef.current = setTimeout(() => {
         setDisplayedTitle(title);
         previousTitleRef.current = title;
         
-        // End animation after a short delay
+        // End animation quickly
         setTimeout(() => {
           setIsAnimating(false);
-        }, 100);
-      }, duration / 2); // Half the duration for the fade out, half for fade in
+        }, 50);
+      }, duration / 3); // Much shorter delay
     }
   }, [title, duration]);
 
@@ -51,12 +51,12 @@ export function AnimatedTitle({ title, className = '', duration = 800 }: Animate
 
   return (
     <span 
-      className={`transition-all duration-300 ease-in-out ${
-        isAnimating ? 'opacity-30 scale-95' : 'opacity-100 scale-100'
+      className={`transition-all ease-out ${
+        isAnimating ? 'opacity-40 scale-98' : 'opacity-100 scale-100'
       } ${className}`}
       style={{
         transitionDuration: `${duration / 2}ms`,
-        transform: isAnimating ? 'translateY(-2px)' : 'translateY(0px)',
+        transform: isAnimating ? 'translateY(-1px)' : 'translateY(0px)',
       }}
     >
       {displayedTitle}

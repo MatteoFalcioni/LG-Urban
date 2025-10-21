@@ -4,7 +4,7 @@
  */
 
 import { useEffect, useState } from 'react';
-import { Plus, MessageSquare, Sun, Moon, Trash2, Archive, Edit2, CheckSquare, Square } from 'lucide-react';
+import { Plus, MessageCircle, Sun, Moon, Trash2, Archive, Edit2, CheckSquare, Square } from 'lucide-react';
 import { useChatStore } from '@/store/chatStore';
 import { createThread, listThreads, archiveThread, unarchiveThread, deleteThread, updateThreadTitle, getThreadState } from '@/utils/api';
 import type { Thread } from '@/types/api';
@@ -21,6 +21,7 @@ export function ThreadSidebar() {
   const setTheme = useChatStore((state) => state.setTheme);
   const setContextUsage = useChatStore((state) => state.setContextUsage);
   const defaultConfig = useChatStore((state) => state.defaultConfig);
+  const addToast = useChatStore((state) => state.addToast);
 
   const [isCreating, setIsCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -96,7 +97,7 @@ export function ThreadSidebar() {
       clearThreadSelection();
       setShowBulkActions(false);
     } catch (err) {
-      alert('Failed to delete some threads');
+      addToast('error', 'Failed to delete some threads', 'Please try again.');
     }
   }
 
@@ -141,7 +142,7 @@ export function ThreadSidebar() {
         <button
           onClick={handleCreateThread}
           disabled={isCreating}
-          className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white rounded-lg transition-colors"
+          className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-gray-800 hover:bg-gray-700 disabled:bg-gray-400 dark:bg-slate-700 dark:hover:bg-slate-600 text-white rounded-lg transition-colors"
         >
           <Plus size={18} />
           <span>{isCreating ? 'Creating...' : 'New Thread'}</span>
@@ -219,7 +220,7 @@ export function ThreadSidebar() {
                   className="flex items-center gap-2 text-sm text-gray-600 dark:text-slate-400 hover:text-gray-900 dark:hover:text-slate-200"
                 >
                   {selectedThreadIds.size === threads.length ? (
-                    <CheckSquare size={16} className="text-blue-600" />
+                    <CheckSquare size={16} className="text-gray-600 dark:text-slate-400" />
                   ) : (
                     <Square size={16} />
                   )}
@@ -252,6 +253,7 @@ export function ThreadSidebar() {
                     }
                   }
                 }}
+                addToast={addToast}
               />
             ))}
           </div>
@@ -272,9 +274,10 @@ interface ThreadItemProps {
   showCheckbox: boolean;
   onToggleSelect: () => void;
   onClick: () => void;
+  addToast: (type: 'error' | 'success' | 'warning' | 'info', title: string, message?: string, duration?: number) => void;
 }
 
-function ThreadItem({ thread, isActive, isSelected, showCheckbox, onToggleSelect, onClick }: ThreadItemProps) {
+function ThreadItem({ thread, isActive, isSelected, showCheckbox, onToggleSelect, onClick, addToast }: ThreadItemProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [editTitle, setEditTitle] = useState(thread.title || '');
   const setThreads = useChatStore((s) => s.setThreads);
@@ -292,7 +295,7 @@ function ThreadItem({ thread, isActive, isSelected, showCheckbox, onToggleSelect
       setThreads(threads.map((t) => (t.id === thread.id ? { ...t, title: editTitle } : t)));
       setIsEditing(false);
     } catch (err) {
-      alert('Failed to update title');
+      addToast('error', 'Failed to update title', 'Please try again.');
       setEditTitle(thread.title || '');
       setIsEditing(false);
     }
@@ -302,13 +305,15 @@ function ThreadItem({ thread, isActive, isSelected, showCheckbox, onToggleSelect
 
   return (
     <div
-      className={`group ${
-        isActive
-          ? 'bg-blue-50 dark:bg-blue-900/20 border-l-4 border-blue-600'
+      className={`group w-full px-2 py-2 transition-colors ${
+        isArchived ? 'opacity-60' : ''
+      } ${
+        isActive 
+          ? 'bg-slate-100 dark:bg-slate-700 border-l-4 border-slate-600 dark:border-slate-400' 
           : isSelected
-          ? 'bg-yellow-50 dark:bg-yellow-900/20 border-l-4 border-yellow-600'
-          : 'hover:bg-gray-100 dark:hover:bg-slate-700/50 border-l-4 border-transparent'
-      } w-full px-2 py-2 transition-colors ${isArchived ? 'opacity-60' : ''}`}
+          ? 'bg-yellow-50 dark:bg-yellow-900/20 border-l-4 border-yellow-500 dark:border-yellow-400'
+          : 'hover:bg-gray-50 dark:hover:bg-slate-700/50 border-l-4 border-transparent'
+      }`}
     >
       <div className="flex items-center gap-2">
         {/* Checkbox for bulk selection */}
@@ -321,7 +326,7 @@ function ThreadItem({ thread, isActive, isSelected, showCheckbox, onToggleSelect
             className="flex-shrink-0"
           >
             {isSelected ? (
-              <CheckSquare size={18} className="text-blue-600" />
+              <CheckSquare size={18} className="text-slate-600 dark:text-slate-400" />
             ) : (
               <Square size={18} className="text-gray-400 dark:text-slate-500" />
             )}
@@ -329,7 +334,7 @@ function ThreadItem({ thread, isActive, isSelected, showCheckbox, onToggleSelect
         )}
         
         <button onClick={onClick} className="flex items-center gap-3 flex-1 text-left min-w-0">
-          <MessageSquare size={18} className="flex-shrink-0 text-gray-400 dark:text-slate-500" />
+          <MessageCircle size={18} className="flex-shrink-0 text-gray-400 dark:text-slate-500" />
           {isEditing ? (
             <input
               type="text"
@@ -352,7 +357,7 @@ function ThreadItem({ thread, isActive, isSelected, showCheckbox, onToggleSelect
               <AnimatedTitle 
                 title={thread.title || 'Untitled'} 
                 className="truncate text-sm font-medium"
-                duration={500}
+                duration={250}
               />
               {isArchived && (
                 <span className="text-xs px-1.5 py-0.5 bg-gray-200 dark:bg-slate-700 rounded flex-shrink-0">
@@ -394,7 +399,7 @@ function ThreadActions({ threadId, isArchived }: { threadId: string; isArchived:
       setThreads(threads.filter((t) => t.id !== threadId));
       if (useChatStore.getState().currentThreadId === threadId) setCurrentThreadId(null);
     } catch (err) {
-      alert('Failed to archive thread');
+      useChatStore.getState().addToast('error', 'Failed to archive thread', 'Please try again.');
     }
   }
 
@@ -416,7 +421,7 @@ function ThreadActions({ threadId, isArchived }: { threadId: string; isArchived:
       if (useChatStore.getState().currentThreadId === threadId) setCurrentThreadId(null);
       setShowDeleteConfirm(false);
     } catch (err) {
-      alert('Failed to delete thread');
+      useChatStore.getState().addToast('error', 'Failed to delete thread', 'Please try again.');
     }
   }
 

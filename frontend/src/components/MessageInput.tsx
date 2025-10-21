@@ -3,12 +3,12 @@
  * Handles user input, sends to backend, streams assistant response, and updates UI.
  */
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { Send } from 'lucide-react';
 import { useChatStore } from '@/store/chatStore';
 import { ContextIndicator } from './ContextIndicator';
 import { useSSE } from '@/hooks/useSSE';
-import { createThread, updateThreadConfig, listMessages } from '@/utils/api';
+import { createThread, updateThreadConfig, listMessages, getThreadState } from '@/utils/api';
 import type { Message } from '@/types/api';
 
 export function MessageInput() {
@@ -27,6 +27,7 @@ export function MessageInput() {
   
   const [input, setInput] = useState('');
   const streamingRef = useRef(''); // Accumulate streaming tokens (mirror to avoid stale closure on onDone)
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
   const addToolDraft = useChatStore((state) => state.addToolDraft);
   const removeToolDraft = useChatStore((state) => state.removeToolDraft);
   const clearToolDrafts = useChatStore((state) => state.clearToolDrafts);
@@ -39,6 +40,33 @@ export function MessageInput() {
   const effectiveMaxTokens = contextUsage.maxTokens === 30000 && defaultConfig.context_window 
     ? defaultConfig.context_window 
     : contextUsage.maxTokens;
+
+  // Update context indicator when thread changes
+  useEffect(() => {
+    if (currentThreadId) {
+      // Fetch current context state for the thread
+      getThreadState(currentThreadId).then((state) => {
+        setContextUsage(state.token_count, state.context_window);
+      }).catch((err) => {
+        console.error('Failed to fetch thread state:', err);
+        // Fallback to default
+        setContextUsage(0, effectiveMaxTokens);
+      });
+    }
+  }, [currentThreadId, setContextUsage, effectiveMaxTokens]);
+
+  // Auto-resize textarea
+  const adjustTextareaHeight = useCallback(() => {
+    const textarea = textareaRef.current;
+    if (textarea) {
+      textarea.style.height = 'auto';
+      textarea.style.height = `${Math.min(textarea.scrollHeight, 200)}px`; // Max height of 200px
+    }
+  }, []);
+
+  useEffect(() => {
+    adjustTextareaHeight();
+  }, [input, adjustTextareaHeight]);
   
   // SSE hook with handlers for streaming events
   const { sendMessage, isStreaming } = useSSE({
@@ -68,14 +96,13 @@ export function MessageInput() {
       if (currentThreadId) {
         // Get current threads from store to avoid stale closure
         const currentThreads = useChatStore.getState().threads;
-        // Add a small delay to make the animation feel more natural
-        setTimeout(() => {
-          setThreads(currentThreads.map((t) => (t.id === currentThreadId ? { ...t, title } : t)));
-        }, 100);
+        // Update immediately for faster response
+        setThreads(currentThreads.map((t) => (t.id === currentThreadId ? { ...t, title } : t)));
       }
     },
     onContextUpdate: (tokensUsed, maxTokens) => {
       // Update context usage circle
+      console.log('Context update received:', tokensUsed, maxTokens);
       setContextUsage(tokensUsed, maxTokens);
     },
     onSummarizing: (status) => {
@@ -157,6 +184,8 @@ export function MessageInput() {
         addThread(newThread);
         setCurrentThreadId(newThread.id);
         threadId = newThread.id;
+        // Initialize context usage for new thread
+        setContextUsage(0, effectiveMaxTokens);
 
         // Apply default config to new thread if any config is set
         if (defaultConfig.model || defaultConfig.temperature !== null || defaultConfig.system_prompt || defaultConfig.context_window !== null) {
@@ -188,6 +217,7 @@ export function MessageInput() {
         {/* Text input with context indicator */}
         <div className="flex-1 relative">
           <textarea
+            ref={textareaRef}
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => {
@@ -200,16 +230,18 @@ export function MessageInput() {
             placeholder={'Type a message...'}
             rows={1}
             disabled={isStreaming}
-            className="w-full px-4 py-3 pr-16 rounded-xl focus:outline-none focus:ring-2 focus:border-transparent resize-none disabled:opacity-50 transition-all duration-200 text-sm"
+            className="w-full px-4 py-3 pr-16 rounded-xl focus:outline-none focus:ring-2 focus:border-transparent resize-none disabled:opacity-50 transition-all duration-200 text-sm overflow-hidden"
             style={{ 
               border: '1px solid var(--border)', 
               backgroundColor: 'var(--bg-secondary)', 
-              color: 'var(--text-primary)'
+              color: 'var(--text-primary)',
+              minHeight: '48px',
+              maxHeight: '200px'
             } as React.CSSProperties}
           />
           
-          {/* Context indicator in bottom-right corner */}
-          <div className="absolute bottom-3 right-3">
+          {/* Context indicator in top-right corner */}
+          <div className="absolute top-3 right-3">
             <ContextIndicator 
               tokensUsed={contextUsage.tokensUsed}
               maxTokens={effectiveMaxTokens}

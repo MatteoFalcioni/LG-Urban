@@ -3,6 +3,7 @@
  * Shows maps, charts, data tables, and other visualizations.
  */
 
+import { useEffect, useRef } from 'react';
 import { useChatStore } from '@/store/chatStore';
 import { ArtifactGrid } from './ArtifactCard';
 
@@ -10,6 +11,7 @@ export function ArtifactDisplay() {
   const currentThreadId = useChatStore((state) => state.currentThreadId);
   const messages = useChatStore((state) => state.messages);
   const artifactBubbles = useChatStore((state) => state.artifactBubbles);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   // Get all artifacts from current thread
   const getCurrentThreadArtifacts = () => {
@@ -35,6 +37,16 @@ export function ArtifactDisplay() {
   };
 
   const artifacts = getCurrentThreadArtifacts();
+
+  // Auto-scroll to bottom when artifacts change
+  useEffect(() => {
+    if (scrollContainerRef.current && artifacts.length > 0) {
+      scrollContainerRef.current.scrollTo({
+        top: scrollContainerRef.current.scrollHeight,
+        behavior: 'smooth'
+      });
+    }
+  }, [artifacts]);
 
   if (!currentThreadId) {
     return (
@@ -68,7 +80,7 @@ export function ArtifactDisplay() {
   }
 
   return (
-    <div className="h-full overflow-auto">
+    <div ref={scrollContainerRef} className="h-full overflow-auto">
       <div className="p-6">
         <div className="mb-4">
           <h2 className="text-lg font-semibold text-gray-900 dark:text-slate-100">

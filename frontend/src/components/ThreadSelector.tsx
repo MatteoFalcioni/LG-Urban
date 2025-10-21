@@ -4,12 +4,16 @@
  */
 
 import { useState, useEffect } from 'react';
-import { ChevronDown, Plus, Sun, Moon, MessageSquare, Pencil, Archive, ArchiveRestore, Trash2, CheckSquare, Square } from 'lucide-react';
+import { ChevronDown, Plus, Sun, Moon, MessageCircle, Pencil, Archive, ArchiveRestore, Trash2, CheckSquare, Square, Menu } from 'lucide-react';
 import { useChatStore } from '@/store/chatStore';
 import { createThread, updateThreadTitle, archiveThread, unarchiveThread, deleteThread, listThreads } from '@/utils/api';
 import { AnimatedTitle } from './AnimatedTitle';
 
-export function ThreadSelector() {
+interface ThreadSelectorProps {
+  onCollapse: () => void;
+}
+
+export function ThreadSelector({ onCollapse }: ThreadSelectorProps) {
   const userId = useChatStore((state) => state.userId);
   const threads = useChatStore((state) => state.threads);
   const addThread = useChatStore((state) => state.addThread);
@@ -189,24 +193,34 @@ export function ThreadSelector() {
     <div className="relative">
       {/* Top bar */}
       <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800">
-        {/* Thread selector */}
-        <div className="flex items-center gap-2">
+        {/* Left side: Collapse button + Thread selector */}
+        <div className="flex items-center gap-3">
+          {/* Collapse button */}
+          <button
+            onClick={onCollapse}
+            className="p-2 rounded-xl border border-gray-200 dark:border-slate-700 hover:bg-gray-50 dark:hover:bg-slate-700 transition-all duration-200 shadow-sm hover:shadow-md group"
+            title="Hide sidebar"
+          >
+            <Menu size={16} className="text-gray-500 dark:text-slate-400 group-hover:text-gray-700 dark:group-hover:text-slate-200 transition-colors" />
+          </button>
+          
+          {/* Thread selector */}
           <button
             onClick={() => setIsOpen(!isOpen)}
             className="flex items-center gap-2 px-4 py-2 rounded-xl border border-gray-200 dark:border-slate-700 hover:bg-gray-50 dark:hover:bg-slate-700 transition-all duration-200 min-w-0 shadow-sm hover:shadow-md"
           >
-            <MessageSquare size={16} className="text-gray-500 dark:text-slate-400 flex-shrink-0" />
+            <MessageCircle size={16} className="text-gray-500 dark:text-slate-400 flex-shrink-0" />
             <AnimatedTitle 
               title={currentThread?.title || 'Select a thread'} 
               className="truncate text-sm font-medium text-gray-700 dark:text-slate-200"
-              duration={600}
+              duration={300}
             />
             <ChevronDown size={14} className="text-gray-400 dark:text-slate-500 flex-shrink-0" />
           </button>
         </div>
 
         {/* Controls */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-3">
           <button
             onClick={handleCreateThread}
             disabled={isCreating}
@@ -232,7 +246,7 @@ export function ThreadSelector() {
 
       {/* Dropdown panel */}
       {isOpen && (
-        <div className="absolute top-full left-0 right-0 z-50 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl shadow-lg max-h-80 overflow-y-auto">
+        <div className="absolute top-full left-0 z-50 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl shadow-lg max-h-80 overflow-y-auto min-w-80 max-w-96">
           {threads.length === 0 ? (
             <div className="p-4 text-center text-gray-500 dark:text-slate-400 text-sm">
               No threads yet. Create one to start chatting!
@@ -289,7 +303,7 @@ export function ThreadSelector() {
                 ) : (
                   <button
                     onClick={() => setBulkMode(true)}
-                    className="text-sm text-blue-600 dark:text-blue-400 hover:underline"
+                    className="text-sm text-gray-600 dark:text-slate-400 hover:text-gray-900 dark:hover:text-slate-200 hover:underline transition-colors"
                   >
                     Select Multiple
                   </button>
@@ -301,13 +315,13 @@ export function ThreadSelector() {
                 <div
                   key={thread.id}
                   className={`group relative px-4 py-3 hover:bg-gray-50 dark:hover:bg-slate-700 transition-all duration-200 ${
-                    thread.id === currentThreadId ? 'bg-blue-50 dark:bg-blue-900/20 border-l-4 border-blue-500' : ''
+                    thread.id === currentThreadId ? 'bg-slate-100 dark:bg-slate-700 border-l-4 border-slate-600 dark:border-slate-400' : ''
                   }`}
                 >
                   {editingThreadId === thread.id ? (
                     // Edit mode
                     <div className="flex items-center gap-2">
-                      <MessageSquare size={16} className="text-gray-400 dark:text-slate-500 flex-shrink-0" />
+                      <MessageCircle size={16} className="text-gray-400 dark:text-slate-500 flex-shrink-0" />
                       <input
                         type="text"
                         value={editingTitle}
@@ -346,7 +360,7 @@ export function ThreadSelector() {
                       onClick={() => bulkMode ? toggleThreadSelection(thread.id) : handleSelectThread(thread.id)}
                       className="flex-1 flex items-center gap-3 min-w-0"
                     >
-                      <MessageSquare size={16} className="text-gray-400 dark:text-slate-500 flex-shrink-0" />
+                      <MessageCircle size={16} className="text-gray-400 dark:text-slate-500 flex-shrink-0" />
                       <span className="truncate text-sm font-medium text-gray-700 dark:text-slate-200">
                         {thread.title || 'Untitled'}
                       </span>

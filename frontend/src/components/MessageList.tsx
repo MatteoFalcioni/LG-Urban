@@ -3,8 +3,7 @@
  * Fetches messages when thread changes and renders user/assistant/tool messages distinctly.
  */
 
-import { useEffect, useRef } from 'react';
-import { User, Bot, Wrench } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
 import { useChatStore } from '@/store/chatStore';
 import { listMessages } from '@/utils/api';
 import type { Message } from '@/types/api';
@@ -36,10 +35,10 @@ export function MessageList() {
     loadMessages();
   }, [currentThreadId, setMessages]);
 
-  // Auto-scroll to bottom when messages change
+  // Auto-scroll to bottom when messages, drafts, or tool executions change
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
+  }, [messages, streamingDraft, toolDrafts]);
 
   if (!currentThreadId) {
     return (
@@ -70,10 +69,7 @@ export function MessageList() {
       {/* Inline typing bubble for assistant draft */}
       {streamingDraft && streamingDraft.threadId === currentThreadId && (
         <div className="flex gap-3 items-start">
-          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-700 dark:to-gray-600 flex items-center justify-center flex-shrink-0 shadow-sm">
-            <Bot size={16} className="text-gray-600 dark:text-gray-300" />
-          </div>
-          <div className="flex-1 max-w-2xl rounded-xl p-4 shadow-sm" style={{ backgroundColor: 'var(--assistant-message-bg)', color: 'var(--assistant-message-text)' }}>
+          <div className="flex-1 w-full rounded-xl p-4 shadow-sm" style={{ backgroundColor: 'var(--assistant-message-bg)', color: 'var(--assistant-message-text)' }}>
             <p className="text-sm whitespace-pre-wrap">{streamingDraft.text}</p>
           </div>
         </div>
@@ -83,23 +79,50 @@ export function MessageList() {
       {toolDrafts
         .filter((t) => t.threadId === currentThreadId)
         .map((t, idx) => (
-          <div key={`tool-draft-${idx}-${t.name}`} className="flex gap-3 items-start">
-            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-50 to-purple-100 dark:from-purple-900/20 dark:to-purple-800/20 flex items-center justify-center flex-shrink-0 shadow-sm">
-              <Wrench size={16} className="text-purple-500 dark:text-purple-400 animate-spin" />
-            </div>
-            <div className="flex-1 bg-gradient-to-r from-purple-50 to-purple-100 dark:from-purple-900/10 dark:to-purple-800/10 rounded-xl p-4 shadow-sm">
-              <div className="text-xs font-semibold text-purple-600 dark:text-purple-300 mb-1">
-                {t.name}
-              </div>
-              {t.input && (
-                <div className="text-xs text-gray-600 dark:text-slate-300">{formatParams(t.input)}</div>
-              )}
-            </div>
-          </div>
+          <ToolCallBubble key={`tool-draft-${idx}-${t.name}`} name={t.name} input={t.input} />
         ))}
       
       {/* Invisible anchor for auto-scroll */}
       <div ref={messagesEndRef} />
+    </div>
+  );
+}
+
+/**
+ * ToolCallBubble: renders a collapsible tool execution indicator with shimmer animation.
+ */
+interface ToolCallBubbleProps {
+  name: string;
+  input?: any;
+}
+
+function ToolCallBubble({ name, input }: ToolCallBubbleProps) {
+  const [isExpanded, setIsExpanded] = useState(false);
+
+  return (
+    <div 
+      className="flex gap-3 items-start cursor-pointer transition-all duration-200 hover:opacity-80"
+      onClick={() => setIsExpanded(!isExpanded)}
+    >
+      <div 
+        className="flex-1 rounded-xl px-4 py-3 shadow-sm backdrop-blur-sm border transition-all"
+        style={{ 
+          backgroundColor: 'color-mix(in srgb, var(--bg-secondary) 60%, transparent)',
+          borderColor: 'color-mix(in srgb, var(--border) 50%, transparent)',
+        }}
+      >
+        <div className="font-mono text-xs font-medium shimmer-text">
+          {name}
+        </div>
+        {isExpanded && input && (
+          <div 
+            className="mt-2 text-xs font-mono opacity-70 pt-2 border-t"
+            style={{ borderColor: 'color-mix(in srgb, var(--border) 30%, transparent)' }}
+          >
+            {formatParams(input)}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -138,13 +161,10 @@ function MessageBubble({ message }: MessageBubbleProps) {
   if (role === 'user') {
     return (
       <div className="flex gap-3 items-start justify-end">
-        <div className="flex-1 max-w-2xl rounded-xl p-4 shadow-sm" style={{ backgroundColor: 'var(--user-message-bg)', color: 'var(--user-message-text)' }}>
+        <div className="flex-1 w-full rounded-xl p-4 shadow-sm" style={{ backgroundColor: 'var(--user-message-bg)', color: 'var(--user-message-text)' }}>
           <p className="text-sm whitespace-pre-wrap leading-relaxed">
             {content?.text || JSON.stringify(content)}
           </p>
-        </div>
-        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-700 dark:to-gray-600 flex items-center justify-center flex-shrink-0 shadow-sm">
-          <User size={16} className="text-gray-600 dark:text-gray-300" />
         </div>
       </div>
     );
@@ -154,10 +174,7 @@ function MessageBubble({ message }: MessageBubbleProps) {
   if (role === 'assistant') {
     return (
       <div className="flex gap-3 items-start">
-        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-700 dark:to-gray-600 flex items-center justify-center flex-shrink-0 shadow-sm">
-          <Bot size={16} className="text-gray-600 dark:text-gray-300" />
-        </div>
-        <div className="flex-1 max-w-2xl rounded-xl p-4 shadow-sm" style={{ backgroundColor: 'var(--assistant-message-bg)', color: 'var(--assistant-message-text)' }}>
+        <div className="flex-1 w-full rounded-xl p-4 shadow-sm" style={{ backgroundColor: 'var(--assistant-message-bg)', color: 'var(--assistant-message-text)' }}>
           <p className="text-sm whitespace-pre-wrap leading-relaxed">
             {content?.text || JSON.stringify(content)}
           </p>

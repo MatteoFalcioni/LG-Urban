@@ -7,11 +7,15 @@ import { ThreadSelector } from './ThreadSelector';
 import { MessageList } from './MessageList';
 import { MessageInput } from './MessageInput';
 
-export function ChatSidebar() {
+interface ChatSidebarProps {
+  onCollapse: () => void;
+}
+
+export function ChatSidebar({ onCollapse }: ChatSidebarProps) {
   return (
     <div className="flex flex-col h-full">
       {/* Thread selector - fixed at top */}
-      <ThreadSelector />
+      <ThreadSelector onCollapse={onCollapse} />
       
       {/* Messages area - scrollable */}
       <div className="flex-1 overflow-hidden">

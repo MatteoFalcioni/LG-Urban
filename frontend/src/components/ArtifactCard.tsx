@@ -37,49 +37,63 @@ export function ArtifactCard({ artifact }: ArtifactCardProps) {
   const isHtml = mime === 'text/html';
 
   return (
-    <div className="flex flex-col space-y-2">
-      {/* Square artifact card with preview */}
-      <div className="aspect-square rounded-lg border border-gray-200 dark:border-slate-600 overflow-hidden bg-white dark:bg-slate-900">
-        {/* Preview content */}
-        {isImage ? (
+    <div className="flex flex-col space-y-3">
+      {/* Images without frame, HTML and others with beige frame */}
+      {isImage ? (
+        /* Static plots with small beige frame */
+        <div 
+          className="rounded-xl overflow-hidden shadow-sm p-2"
+          style={{ backgroundColor: 'var(--bg-secondary)' }}
+        >
           <img 
             src={url} 
             alt={name}
-            className="w-full h-full object-contain"
+            className="w-full object-contain rounded-lg"
+            style={{ 
+              maxHeight: '800px',
+              objectFit: 'contain'
+            }}
           />
-        ) : isHtml ? (
-          <iframe
-            src={url}
-            className="w-full h-full border-0"
-            title={name}
-            sandbox="allow-scripts allow-same-origin"
-          />
-        ) : (
-          <div className="w-full h-full flex flex-col items-center justify-center p-4">
-            <div className="w-12 h-12 bg-gray-100 dark:bg-slate-800 rounded-lg flex items-center justify-center border border-gray-200 dark:border-slate-600 mb-3">
-              {getIconForMime(mime)}
+        </div>
+      ) : (
+        /* HTML and other files with beige card */
+        <div 
+          className={`rounded-xl overflow-hidden shadow-sm ${isHtml ? 'aspect-square' : 'h-24'}`}
+          style={{ backgroundColor: 'var(--bg-secondary)', color: 'var(--text-primary)' }}
+        >
+          {isHtml ? (
+            <iframe
+              src={url}
+              className="w-full h-full border-0"
+              title={name}
+              sandbox="allow-scripts allow-same-origin"
+            />
+          ) : (
+            <div className="w-full h-full flex items-center justify-center p-4">
+              <div className="flex items-center space-x-3">
+                <div className="w-8 h-8 bg-white/10 rounded-lg flex items-center justify-center">
+                  {getIconForMime(mime)}
+                </div>
+                <div className="text-left">
+                  <p className="text-sm font-medium truncate max-w-48" title={name}>
+                    {name}
+                  </p>
+                  <p className="text-xs opacity-75">
+                    {formatFileSize(size)}
+                  </p>
+                </div>
+              </div>
             </div>
-            <div className="text-center space-y-1">
-              <p className="text-sm font-medium text-gray-900 dark:text-white truncate" title={name}>
-                {name}
-              </p>
-              <p className="text-xs text-gray-500 dark:text-slate-400">
-                {mime}
-              </p>
-              <p className="text-xs text-gray-500 dark:text-slate-400">
-                {formatFileSize(size)}
-              </p>
-            </div>
-          </div>
-        )}
-      </div>
+          )}
+        </div>
+      )}
       
-      {/* Download button inline below */}
-      <div className="flex justify-center">
+      {/* Download button inline below - reduced spacing for images */}
+      <div className={`flex justify-center ${isImage ? 'mt-2' : 'mt-3'}`}>
         <a
           href={url}
           download={name}
-          className="px-4 py-2 bg-gray-800 dark:bg-slate-700 text-white dark:text-slate-100 rounded-lg hover:bg-gray-700 dark:hover:bg-slate-600 transition-colors flex items-center space-x-2 text-sm font-medium"
+          className="px-6 py-3 bg-gray-800 dark:bg-slate-700 text-white dark:text-slate-100 rounded-xl hover:bg-gray-700 dark:hover:bg-slate-600 transition-colors flex items-center space-x-2 text-sm font-medium shadow-sm"
           title={`Download ${name}`}
         >
           <Download size={16} />
@@ -107,7 +121,7 @@ export function ArtifactGrid({ artifacts }: ArtifactGridProps) {
       <p className="text-xs font-semibold text-gray-500 dark:text-slate-400 uppercase tracking-wide">
         Generated Files ({artifacts.length})
       </p>
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 gap-6 max-w-2xl mx-auto">
         {artifacts.map((artifact) => (
           <ArtifactCard key={artifact.id} artifact={artifact} />
         ))}

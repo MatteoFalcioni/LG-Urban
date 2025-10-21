@@ -5,6 +5,7 @@
 
 import { create } from 'zustand';
 import type { Thread, Message, Artifact } from '@/types/api';
+import type { ToastType } from '@/components/Toast';
 
 interface ChatStore {
   // User identity (anonymous UUID stored in localStorage)
@@ -64,6 +65,11 @@ interface ChatStore {
   setContextUsage: (tokensUsed: number, maxTokens: number) => void;
   isSummarizing: boolean;
   setIsSummarizing: (value: boolean) => void;
+
+  // Toast notifications
+  toasts: Array<{ id: string; type: ToastType; title: string; message?: string; duration?: number }>;
+  addToast: (type: ToastType, title: string, message?: string, duration?: number) => void;
+  removeToast: (id: string) => void;
 
   // Bulk selection for threads
   selectedThreadIds: Set<string>;
@@ -159,6 +165,14 @@ export const useChatStore = create<ChatStore>((set) => ({
   setContextUsage: (tokensUsed, maxTokens) => set({ contextUsage: { tokensUsed, maxTokens } }),
   isSummarizing: false,
   setIsSummarizing: (value) => set({ isSummarizing: value }),
+
+  toasts: [],
+  addToast: (type, title, message, duration) => set((state) => ({
+    toasts: [...state.toasts, { id: Date.now().toString(), type, title, message, duration }]
+  })),
+  removeToast: (id) => set((state) => ({
+    toasts: state.toasts.filter(toast => toast.id !== id)
+  })),
 
   selectedThreadIds: new Set(),
   toggleThreadSelection: (threadId) =>

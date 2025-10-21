@@ -115,7 +115,7 @@ def extract_text_from_content(content: Any) -> str:
     """
     Extract text from message content, handling both dict and list formats.
     - Dict format: {'text': '...'} → returns the text
-    - List format: [{'text': '...', 'type': 'text'}] → returns text from first item
+    - List format: [{'text': '...', 'type': 'text'}] → returns text from all text blocks (ignores tool_use)
     - String: returns as-is
     - Other: returns string representation
     """
@@ -128,10 +128,22 @@ def extract_text_from_content(content: Any) -> str:
     
     # List format (Claude/new models)
     if isinstance(content, list) and len(content) > 0:
-        first_item = content[0]
-        if isinstance(first_item, dict) and 'text' in first_item:
-            return first_item['text']
-        return str(content)
+        # Filter and extract only text blocks, ignore tool_use blocks
+        text_parts = []
+        for item in content:
+            if isinstance(item, dict):
+                # Only process text blocks, skip tool_use and other types
+                if item.get('type') == 'text' and 'text' in item:
+                    text_parts.append(item['text'])
+                # Legacy format without explicit type
+                elif 'text' in item and 'type' not in item:
+                    text_parts.append(item['text'])
+        
+        if text_parts:
+            return ''.join(text_parts)
+        
+        # Fallback: if no text blocks found, return empty string (don't show tool use JSON)
+        return ''
     
     # String or other
     return str(content)
@@ -716,19 +728,9 @@ async def post_message_stream(
                 # Extract text from content dict; LangChain messages expect string content
                 user_text = payload.content.get("text", str(payload.content))
                 state = {"messages": [{"role": "user", "content": user_text}]}
-                config = {"configurable": {"thread_id": str(thread_id)}}
+                config = {"configurable": {"thread_id": str(thread_id), "recursion_limit": 40}}
                 
-                # Get context usage from graph state BEFORE streaming
-                try:
-                    from backend.config import CONTEXT_WINDOW as DEFAULT_CONTEXT_WINDOW
-                    state_snapshot = await graph.aget_state(config)
-                    token_count = state_snapshot.values.get("token_count", 0) if state_snapshot.values else 0
-                    # Use thread config context_window or env default
-                    max_tokens = cfg.context_window if cfg and cfg.context_window else DEFAULT_CONTEXT_WINDOW
-                    # Emit context update for frontend circle
-                    yield f"data: {json.dumps({'type': 'context_update', 'tokens_used': token_count, 'max_tokens': max_tokens})}\n\n"
-                except Exception as e:
-                    logging.warning(f"Failed to get state for context update: {e}")
+                # Context update will be emitted after agent finishes processing
                 
                 # Stream events from LangGraph
                 # We follow docs here: https://python.langchain.com/api_reference/core/language_models/langchain_core.language_models.chat_models.BaseChatModel.html?_gl=1*15ktatf*_gcl_au*MTc4MTgwMzA1Ny4xNzU4ODA2Mjcy*_ga*MTUzOTQwNjk3NS4xNzUwODY1MDM0*_ga_47WX3HKKY2*czE3NTk4MjY0Mzkkbzk5JGcxJHQxNzU5ODI2NTg0JGoxMyRsMCRoMA..#langchain_core.language_models.chat_models.BaseChatModel.astream_events
@@ -757,6 +759,17 @@ async def post_message_stream(
                         yield f"data: {json.dumps({'type': 'summarizing', 'status': 'start'})}\n\n"
                     
                     # Detect summarization end
+                    elif event_type == "on_chain_end" and node == "agent":
+                        # Emit context update after agent finishes processing
+                        try:
+                            from backend.config import CONTEXT_WINDOW as DEFAULT_CONTEXT_WINDOW
+                            state_snapshot = await graph.aget_state(config)
+                            token_count = state_snapshot.values.get("token_count", 0) if state_snapshot.values else 0
+                            max_tokens = cfg.context_window if cfg and cfg.context_window else DEFAULT_CONTEXT_WINDOW
+                            yield f"data: {json.dumps({'type': 'context_update', 'tokens_used': token_count, 'max_tokens': max_tokens})}\n\n"
+                        except Exception as e:
+                            logging.warning(f"Failed to get state for context update: {e}")
+                    
                     elif event_type == "on_chat_model_end" and checkpoint_ns.startswith("summarize_conversation:"):
                         yield f"data: {json.dumps({'type': 'summarizing', 'status': 'done'})}\n\n"
                         # Emit context reset immediately after summarization (token_count is now 0)

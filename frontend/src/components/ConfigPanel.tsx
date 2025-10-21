@@ -207,7 +207,12 @@ export function ConfigPanel() {
           <select
             value={config.model || 'gpt-4.1'}
             onChange={(e) => setConfig({ ...config, model: e.target.value })}
-            className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full px-3 py-2 rounded-lg focus:outline-none text-sm"
+            style={{ 
+              border: '1px solid var(--border)', 
+              backgroundColor: 'var(--bg-secondary)', 
+              color: 'var(--text-primary)'
+            }}
           >
             <optgroup label="OpenAI">
               <option value="gpt-4.1">GPT-4.1</option>
@@ -232,7 +237,13 @@ export function ConfigPanel() {
             step="0.1"
             value={config.temperature ?? 0.7}
             onChange={(e) => setConfig({ ...config, temperature: parseFloat(e.target.value) })}
-            className="w-full accent-blue-600"
+            className="w-full"
+            style={{ 
+              accentColor: 'var(--user-message-bg)',
+              backgroundColor: 'var(--bg-secondary)',
+              borderRadius: '0.5rem',
+              height: '6px'
+            }}
           />
           <div className="flex justify-between text-xs text-gray-500 dark:text-slate-400 mt-1">
             <span>Precise (0.0)</span>
@@ -252,7 +263,12 @@ export function ConfigPanel() {
             step="1000"
             value={config.context_window ?? defaultConfig.context_window ?? 30000}
             onChange={(e) => setConfig({ ...config, context_window: parseInt(e.target.value) || null })}
-            className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+            className="w-full px-3 py-2 rounded-lg focus:outline-none text-sm"
+            style={{ 
+              border: '1px solid var(--border)', 
+              backgroundColor: 'var(--bg-secondary)', 
+              color: 'var(--text-primary)'
+            }}
           />
           <p className="text-xs text-gray-500 dark:text-slate-400 mt-1">
             Maximum context size before summarization (GPT-4o: 128k, Base tier: 30k)
@@ -267,7 +283,12 @@ export function ConfigPanel() {
             onChange={(e) => setConfig({ ...config, system_prompt: e.target.value })}
             placeholder="Custom instructions for the assistant"
             rows={6}
-            className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none text-sm"
+            className="w-full px-3 py-2 rounded-lg focus:outline-none resize-none text-sm"
+            style={{ 
+              border: '1px solid var(--border)', 
+              backgroundColor: 'var(--bg-secondary)', 
+              color: 'var(--text-primary)'
+            }}
           />
         </div>
 
@@ -291,7 +312,12 @@ export function ConfigPanel() {
                 value={apiKeyInputs.openai}
                 onChange={(e) => setApiKeyInputs({ ...apiKeyInputs, openai: e.target.value })}
                 placeholder="sk-..."
-                className="w-full px-3 py-2 pr-10 border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                className="w-full px-3 py-2 pr-10 rounded-lg focus:outline-none text-sm"
+                style={{ 
+                  border: '1px solid var(--border)', 
+                  backgroundColor: 'var(--bg-secondary)', 
+                  color: 'var(--text-primary)'
+                }}
               />
               <button
                 type="button"
@@ -316,7 +342,12 @@ export function ConfigPanel() {
                 value={apiKeyInputs.anthropic}
                 onChange={(e) => setApiKeyInputs({ ...apiKeyInputs, anthropic: e.target.value })}
                 placeholder="sk-ant-..."
-                className="w-full px-3 py-2 pr-10 border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                className="w-full px-3 py-2 pr-10 rounded-lg focus:outline-none text-sm"
+                style={{ 
+                  border: '1px solid var(--border)', 
+                  backgroundColor: 'var(--bg-secondary)', 
+                  color: 'var(--text-primary)'
+                }}
               />
               <button
                 type="button"
@@ -336,7 +367,11 @@ export function ConfigPanel() {
           <button
             onClick={handleSaveApiKeys}
             disabled={isSavingKeys}
-            className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-300 dark:disabled:bg-slate-700 text-white rounded-lg transition-colors text-sm"
+            className="w-full flex items-center justify-center gap-2 px-4 py-2 text-white rounded-lg transition-colors text-sm"
+            style={{ 
+              backgroundColor: 'var(--user-message-bg)',
+              opacity: isSavingKeys ? 0.6 : 1
+            }}
           >
             <Key size={16} />
             <span>{isSavingKeys ? 'Saving...' : 'Save API Keys'}</span>
@@ -357,7 +392,11 @@ export function ConfigPanel() {
         <button
           onClick={handleSave}
           disabled={isSaving}
-          className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 dark:disabled:bg-slate-700 text-white rounded-lg transition-colors"
+          className="w-full flex items-center justify-center gap-2 px-4 py-2 text-white rounded-lg transition-colors"
+          style={{ 
+            backgroundColor: 'var(--user-message-bg)',
+            opacity: isSaving ? 0.6 : 1
+          }}
         >
           <Save size={18} />
           <span>{isSaving ? 'Saving...' : 'Save Config'}</span>
