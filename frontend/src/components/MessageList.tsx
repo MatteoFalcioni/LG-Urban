@@ -8,6 +8,7 @@ import { ArrowDown } from 'lucide-react';
 import { useChatStore } from '@/store/chatStore';
 import { listMessages } from '@/utils/api';
 import type { Message } from '@/types/api';
+import { ThinkingBlock } from './ThinkingBlock';
 
 export function MessageList() {
   const currentThreadId = useChatStore((state) => state.currentThreadId);
@@ -16,6 +17,7 @@ export function MessageList() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const streamingDraft = useChatStore((state) => state.streamingDraft);
+  const thinkingBlock = useChatStore((state) => state.thinkingBlock);
   const toolDrafts = useChatStore((state) => state.toolDrafts);
   const [showScrollButton, setShowScrollButton] = useState(false);
 
@@ -57,7 +59,7 @@ export function MessageList() {
   // Auto-scroll when new AI messages arrive
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages, streamingDraft, toolDrafts]);
+  }, [messages, streamingDraft, thinkingBlock, toolDrafts]);
 
   if (!currentThreadId) {
     return (
@@ -90,13 +92,10 @@ export function MessageList() {
               message={msg} 
             />
           ))}
-        {/* Inline typing bubble for assistant draft */}
-        {streamingDraft && streamingDraft.threadId === currentThreadId && (
-          <div className="flex gap-3 items-start">
-            <div className="flex-1 w-full rounded-xl p-4 shadow-sm" style={{ backgroundColor: 'var(--assistant-message-bg)', color: 'var(--assistant-message-text)' }}>
-              <p className="text-sm whitespace-pre-wrap">{streamingDraft.text}</p>
-            </div>
-          </div>
+        
+        {/* Thinking block (Claude extended thinking) */}
+        {thinkingBlock && thinkingBlock.threadId === currentThreadId && (
+          <ThinkingBlock content={thinkingBlock.content} />
         )}
 
         {/* Inline tool execution drafts (no artifacts here) */}
@@ -105,6 +104,15 @@ export function MessageList() {
           .map((t, idx) => (
             <ToolCallBubble key={`tool-draft-${idx}-${t.name}`} name={t.name} input={t.input} />
           ))}
+
+        {/* Inline typing bubble for assistant draft */}
+        {streamingDraft && streamingDraft.threadId === currentThreadId && (
+          <div className="flex gap-3 items-start">
+            <div className="flex-1 w-full rounded-xl p-4 shadow-sm" style={{ backgroundColor: 'var(--assistant-message-bg)', color: 'var(--assistant-message-text)' }}>
+              <p className="text-sm whitespace-pre-wrap">{streamingDraft.text}</p>
+            </div>
+          </div>
+        )}
         
         {/* Invisible anchor for scroll target */}
         <div ref={messagesEndRef} />

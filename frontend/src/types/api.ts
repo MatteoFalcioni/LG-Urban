@@ -43,6 +43,7 @@ export interface Artifact {
 // SSE event types from backend streaming
 export type SSEEvent =
   | { type: 'token'; content: string }
+  | { type: 'thinking'; content: string }
   | { type: 'tool_start'; name: string; input: any }
   | { type: 'tool_end'; name: string; output: any; artifacts?: Artifact[] }
   | { type: 'title_updated'; title: string }

@@ -734,12 +734,38 @@ async def post_message_stream(
                 
                 # Stream events from LangGraph
                 # We follow docs here: https://python.langchain.com/api_reference/core/language_models/langchain_core.language_models.chat_models.BaseChatModel.html?_gl=1*15ktatf*_gcl_au*MTc4MTgwMzA1Ny4xNzU4ODA2Mjcy*_ga*MTUzOTQwNjk3NS4xNzUwODY1MDM0*_ga_47WX3HKKY2*czE3NTk4MjY0Mzkkbzk5JGcxJHQxNzU5ODI2NTg0JGoxMyRsMCRoMA..#langchain_core.language_models.chat_models.BaseChatModel.astream_events
+                
+                # Variables to track thinking vs final response
+                current_step_content = ""  # Accumulate ALL content in current step
+                current_step_has_tools = False
+                current_langgraph_step = None
+                # Track all streamed content for database storage (only final response)
+                all_streamed_content = ""
+                
                 async for event in graph.astream_events(state, config, version="v2"):
                     event_type = event.get("event")
                     event_name = event.get("name", "")
                     event_meta = event.get("metadata", {})
                     node = event_meta.get("langgraph_node")
                     checkpoint_ns = event_meta.get("langgraph_checkpoint_ns", "")
+                    langgraph_step = event_meta.get("langgraph_step")
+                    
+                    # Detect step change - decide if previous step was thinking or final response
+                    if langgraph_step != current_langgraph_step and current_langgraph_step is not None:
+                        if current_step_content:
+                            if current_step_has_tools:
+                                # Previous step had tool calls - it was thinking (Claude pattern)
+                                yield f"data: {json.dumps({'type': 'thinking', 'content': current_step_content})}\n\n"
+                            else:
+                                # Previous step had no tool calls - it was final response, stream it now
+                                all_streamed_content += current_step_content
+                                yield f"data: {json.dumps({'type': 'token', 'content': current_step_content})}\n\n"
+                        
+                        # Reset for new step
+                        current_step_content = ""
+                        current_step_has_tools = False
+                    
+                    current_langgraph_step = langgraph_step
                     
                     # Stream token chunks from the LLM (but not from summarizer or its sub-calls)
                     if event_type == "on_chat_model_stream":
@@ -748,11 +774,16 @@ async def post_message_stream(
                             continue
                         
                         chunk = event.get("data", {}).get("chunk")
-                        if chunk and hasattr(chunk, "content") and chunk.content:
-                            # Extract text from chunk content (handle both string and list formats)
-                            chunk_text = extract_text_from_content(chunk.content)
-                            if chunk_text:
-                                yield f"data: {json.dumps({'type': 'token', 'content': chunk_text})}\n\n"
+                        if chunk:
+                            # Check if this chunk has tool calls (indicates thinking/reasoning phase)
+                            if hasattr(chunk, "tool_call_chunks") and chunk.tool_call_chunks:
+                                current_step_has_tools = True
+                            
+                            # Extract text from chunk content - always accumulate, decide later
+                            if hasattr(chunk, "content") and chunk.content:
+                                chunk_text = extract_text_from_content(chunk.content)
+                                if chunk_text:
+                                    current_step_content += chunk_text
                     
                     # Detect summarization start
                     elif event_type == "on_chat_model_start" and checkpoint_ns.startswith("summarize_conversation:"):
@@ -769,6 +800,7 @@ async def post_message_stream(
                             yield f"data: {json.dumps({'type': 'context_update', 'tokens_used': token_count, 'max_tokens': max_tokens})}\n\n"
                         except Exception as e:
                             logging.warning(f"Failed to get state for context update: {e}")
+                    
                     
                     elif event_type == "on_chat_model_end" and checkpoint_ns.startswith("summarize_conversation:"):
                         yield f"data: {json.dumps({'type': 'summarizing', 'status': 'done'})}\n\n"
@@ -843,6 +875,13 @@ async def post_message_stream(
                         
                         yield f"data: {json.dumps(event_data)}\n\n"
                     
+                    elif event_type == "on_chat_model_end" and checkpoint_ns.startswith("summarize_conversation:"):
+                        yield f"data: {json.dumps({'type': 'summarizing', 'status': 'done'})}\n\n"
+                        # Emit context reset immediately after summarization (token_count is now 0)
+                        from backend.config import CONTEXT_WINDOW as DEFAULT_CONTEXT_WINDOW
+                        max_tokens = cfg.context_window if cfg and cfg.context_window else DEFAULT_CONTEXT_WINDOW
+                        yield f"data: {json.dumps({'type': 'context_update', 'tokens_used': 0, 'max_tokens': max_tokens})}\n\n"
+                
                     # Capture final assistant message (but not from summarizer or its sub-calls)
                     elif event_type == "on_chat_model_end":
                         # Skip if inside summarization context
@@ -852,6 +891,16 @@ async def post_message_stream(
                         output = event.get("data", {}).get("output")
                         if output and hasattr(output, "content"):
                             assistant_content = output.content
+                
+                # Handle the last step's content after the loop ends
+                if current_step_content:
+                    if current_step_has_tools:
+                        # Last step had tool calls - it was thinking
+                        yield f"data: {json.dumps({'type': 'thinking', 'content': current_step_content})}\n\n"
+                    else:
+                        # Last step had no tool calls - it was final response
+                        all_streamed_content += current_step_content
+                        yield f"data: {json.dumps({'type': 'token', 'content': current_step_content})}\n\n"
                 
                 # Persist using a short-lived session to avoid holding an open connection during SSE
                 a_msg_id = None
@@ -878,19 +927,18 @@ async def post_message_stream(
                         )
                         write_sess.add(tool_msg)
 
-                    # Assistant message
-                    if assistant_content:
-                        a_msg = Message(
-                            thread_id=t.id,
-                            message_id=f"assistant:{payload.message_id}",
-                            role="assistant",
-                            content={"text": assistant_content} if isinstance(assistant_content, str) else assistant_content,
-                        )
-                        write_sess.add(a_msg)
-                        await write_sess.commit()
-                        a_msg_id = str(a_msg.id)
-                    elif tool_calls:
-                        await write_sess.commit()
+                    # Assistant message - use content that was actually streamed to user
+                    assistant_content_to_save = all_streamed_content if all_streamed_content else ""
+                    logging.info(f"DEBUG: all_streamed_content='{all_streamed_content}', assistant_content='{assistant_content}', saving='{assistant_content_to_save}'")
+                    a_msg = Message(
+                        thread_id=t.id,
+                        message_id=f"assistant:{payload.message_id}",
+                        role="assistant",
+                        content={"text": assistant_content_to_save} if isinstance(assistant_content_to_save, str) else assistant_content_to_save,
+                    )
+                    write_sess.add(a_msg)
+                    await write_sess.commit()
+                    a_msg_id = str(a_msg.id)
 
                 # Auto-title in a separate short-lived session (best-effort)
                 if a_msg_id:
@@ -901,6 +949,7 @@ async def post_message_stream(
                         async with ASYNC_SESSION_MAKER() as title_sess:
                             thread_check = await title_sess.get(Thread, t.id)
                             if thread_check and thread_check.title == "New chat":
+                                logging.info(f"Auto-titling thread {t.id}")
                                 stmt = (
                                     select(Message)
                                     .where(Message.thread_id == thread_check.id)
@@ -913,14 +962,24 @@ async def post_message_stream(
                                     f"{m.role}: {extract_text_from_content(m.content)}"
                                     for m in messages
                                 ])
+                                
+                                if not thread_text.strip():
+                                    logging.warning("No content to generate title from")
+                                    return
+                                
                                 # Configure LLM with user's API key if available
                                 from pydantic import SecretStr
                                 import os
                                 llm_kwargs = {"model": "gpt-4o-mini", "temperature": 0}
                                 if user_api_keys and user_api_keys.get('openai_key'):
                                     llm_kwargs['api_key'] = SecretStr(user_api_keys['openai_key'])
+                                    logging.info("Using user's OpenAI API key for titling")
                                 elif os.getenv('OPENAI_API_KEY'):
                                     llm_kwargs['api_key'] = SecretStr(os.getenv('OPENAI_API_KEY'))
+                                    logging.info("Using environment OpenAI API key for titling")
+                                else:
+                                    logging.warning("No OpenAI API key available for titling")
+                                    return
                                 
                                 llm = ChatOpenAI(**llm_kwargs)
                                 prompt = ChatPromptTemplate.from_messages([
@@ -929,6 +988,7 @@ async def post_message_stream(
                                 ])
                                 chain = prompt | llm | StrOutputParser()
                                 new_title = chain.invoke({"body": thread_text})
+                                logging.info(f"Generated title: {new_title}")
                                 thread_check.title = new_title
                                 await title_sess.commit()
                                 # Notify frontend of title update

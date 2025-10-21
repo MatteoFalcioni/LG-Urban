@@ -21,6 +21,8 @@ export function MessageInput() {
   const defaultConfig = useChatStore((state) => state.defaultConfig);
   const setDraft = useChatStore((state) => state.setStreamingDraft);
   const clearDraft = useChatStore((state) => state.clearStreamingDraft);
+  const setThinkingBlock = useChatStore((state) => state.setThinkingBlock);
+  const clearThinkingBlock = useChatStore((state) => state.clearThinkingBlock);
   const setThreads = useChatStore((state) => state.setThreads);
   const setContextUsage = useChatStore((state) => state.setContextUsage);
   const setIsSummarizing = useChatStore((state) => state.setIsSummarizing);
@@ -70,6 +72,12 @@ export function MessageInput() {
   
   // SSE hook with handlers for streaming events
   const { sendMessage, isStreaming } = useSSE({
+    onThinking: (content) => {
+      // Set thinking block (Claude extended thinking)
+      if (currentThreadId) {
+        setThinkingBlock(currentThreadId, content);
+      }
+    },
     onToken: (content) => {
       // Accumulate token chunks for assistant message
       streamingRef.current = streamingRef.current + content;
@@ -132,6 +140,7 @@ export function MessageInput() {
       // Reset streaming state
       streamingRef.current = '';
       clearDraft();
+      clearThinkingBlock();
       
       // Clear any remaining tool drafts (handles failed tools that didn't send tool_end)
       if (currentThreadId) {
@@ -163,6 +172,7 @@ export function MessageInput() {
       alert(`Error: ${error}`);
       streamingRef.current = '';
       clearDraft();
+      clearThinkingBlock();
       
       // Clear any hanging tool drafts when stream errors out
       if (currentThreadId) {

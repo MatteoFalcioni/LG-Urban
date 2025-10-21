@@ -10,6 +10,7 @@ import type { Artifact } from '@/types/api';
 
 interface UseSSEOptions {
   onToken?: (content: string) => void;
+  onThinking?: (content: string) => void;
   onToolStart?: (name: string, input: any) => void;
   onToolEnd?: (name: string, output: any, artifacts?: Artifact[]) => void;
   onTitleUpdated?: (title: string) => void;
@@ -86,6 +87,8 @@ export function useSSE(options: UseSSEOptions) {
                 // Dispatch to handlers based on event type
                 if (event.type === 'token') {
                   options.onToken?.(event.content);
+                } else if (event.type === 'thinking') {
+                  options.onThinking?.(event.content);
                 } else if (event.type === 'tool_start') {
                   options.onToolStart?.(event.name, event.input);
                 } else if (event.type === 'tool_end') {

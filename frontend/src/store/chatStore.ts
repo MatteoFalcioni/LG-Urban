@@ -33,6 +33,11 @@ interface ChatStore {
   setStreamingDraft: (threadId: string, text: string) => void;
   clearStreamingDraft: () => void;
 
+  // Thinking block (Claude extended thinking before tool calls)
+  thinkingBlock: { threadId: string; content: string } | null;
+  setThinkingBlock: (threadId: string, content: string) => void;
+  clearThinkingBlock: () => void;
+
   // Live tool execution drafts shown inline while tools run
   toolDrafts: { threadId: string; name: string; input?: any }[];
   addToolDraft: (threadId: string, name: string, input?: any) => void;
@@ -118,6 +123,10 @@ export const useChatStore = create<ChatStore>((set) => ({
   streamingDraft: null,
   setStreamingDraft: (threadId, text) => set({ streamingDraft: { threadId, text } }),
   clearStreamingDraft: () => set({ streamingDraft: null }),
+
+  thinkingBlock: null,
+  setThinkingBlock: (threadId, content) => set({ thinkingBlock: { threadId, content } }),
+  clearThinkingBlock: () => set({ thinkingBlock: null }),
 
   toolDrafts: [],
   addToolDraft: (threadId, name, input) =>
