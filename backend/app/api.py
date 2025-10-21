@@ -728,7 +728,7 @@ async def post_message_stream(
                 # Extract text from content dict; LangChain messages expect string content
                 user_text = payload.content.get("text", str(payload.content))
                 state = {"messages": [{"role": "user", "content": user_text}]}
-                config = {"configurable": {"thread_id": str(thread_id), "recursion_limit": 40}}
+                config = {"configurable": {"thread_id": str(thread_id)}, "recursion_limit": 40}
                 
                 # Context update will be emitted after agent finishes processing
                 
@@ -1003,10 +1003,11 @@ async def save_user_api_keys(
         session.add(user_keys)
     
     # Update keys (encrypt before storing)
-    if keys.openai_key is not None:
+    # Handle both empty strings and None - treat both as "clear the key"
+    if 'openai_key' in keys.model_fields_set:
         user_keys.openai_key = encrypt_api_key(keys.openai_key) if keys.openai_key else None
     
-    if keys.anthropic_key is not None:
+    if 'anthropic_key' in keys.model_fields_set:
         user_keys.anthropic_key = encrypt_api_key(keys.anthropic_key) if keys.anthropic_key else None
     
     await session.commit()

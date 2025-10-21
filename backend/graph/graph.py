@@ -75,6 +75,9 @@ def make_graph(model_name: str | None = None, temperature: float | None = None, 
     if temp is not None:
         llm_kwargs["temperature"] = temp
 
+    if model_name == "gpt-5":
+        llm_kwargs["temperature"] = 1.0  # gpt-5 only accepts 1
+
     # Use user API keys if available, otherwise fall back to environment variables
     if model_name.startswith("gpt-"):
         api_key = None

@@ -67,7 +67,7 @@ function App() {
   }
 
   return (
-    <div className="flex h-screen bg-gray-50 dark:bg-slate-900 text-gray-700 dark:text-slate-200">
+    <div className="flex h-screen bg-gray-50 dark:bg-slate-900 text-gray-700 dark:text-slate-200 overflow-hidden">
       {/* Sidebar: Thread list (resizable/collapsible) */}
       {!isSidebarCollapsed && (
         <aside
@@ -95,9 +95,9 @@ function App() {
       )}
 
       {/* Main content: Artifact Display */}
-      <main className="flex-1 flex flex-col">
+      <main className="flex-1 flex flex-col overflow-hidden">
         {/* Header with config toggle */}
-        <div className="flex items-center justify-end p-2 border-b border-gray-200 dark:border-slate-700">
+        <div className="flex items-center justify-end p-2 border-b border-gray-200 dark:border-slate-700 flex-shrink-0">
           <button
             onClick={toggleConfigPanel}
             className="p-2 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg shadow-sm hover:bg-gray-50 dark:hover:bg-slate-700 transition-all duration-200 flex items-center justify-center"
@@ -108,7 +108,9 @@ function App() {
         </div>
         
         {/* Artifact display area */}
-        <ArtifactDisplay />
+        <div className="flex-1 overflow-hidden">
+          <ArtifactDisplay />
+        </div>
       </main>
 
       {/* Right panel: Config (toggleable) */}

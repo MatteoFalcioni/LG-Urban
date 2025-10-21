@@ -13,9 +13,11 @@ interface ChatSidebarProps {
 
 export function ChatSidebar({ onCollapse }: ChatSidebarProps) {
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full overflow-hidden">
       {/* Thread selector - fixed at top */}
-      <ThreadSelector onCollapse={onCollapse} />
+      <div className="flex-shrink-0">
+        <ThreadSelector onCollapse={onCollapse} />
+      </div>
       
       {/* Messages area - scrollable */}
       <div className="flex-1 overflow-hidden">
@@ -23,7 +25,9 @@ export function ChatSidebar({ onCollapse }: ChatSidebarProps) {
       </div>
       
       {/* Input area - fixed at bottom */}
-      <MessageInput />
+      <div className="flex-shrink-0">
+        <MessageInput />
+      </div>
     </div>
   );
 }

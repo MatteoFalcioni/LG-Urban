@@ -3,7 +3,8 @@
  * Fetches messages when thread changes and renders user/assistant/tool messages distinctly.
  */
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
+import { ArrowDown } from 'lucide-react';
 import { useChatStore } from '@/store/chatStore';
 import { listMessages } from '@/utils/api';
 import type { Message } from '@/types/api';
@@ -13,8 +14,10 @@ export function MessageList() {
   const messages = useChatStore((state) => state.messages);
   const setMessages = useChatStore((state) => state.setMessages);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
   const streamingDraft = useChatStore((state) => state.streamingDraft);
   const toolDrafts = useChatStore((state) => state.toolDrafts);
+  const [showScrollButton, setShowScrollButton] = useState(false);
 
   // Fetch messages when thread changes
   useEffect(() => {
@@ -35,7 +38,23 @@ export function MessageList() {
     loadMessages();
   }, [currentThreadId, setMessages]);
 
-  // Auto-scroll to bottom when messages, drafts, or tool executions change
+  // Check if user is near bottom (to show/hide scroll button)
+  const handleScroll = useCallback(() => {
+    if (!scrollContainerRef.current) return;
+    
+    const { scrollTop, scrollHeight, clientHeight } = scrollContainerRef.current;
+    const distanceFromBottom = scrollHeight - scrollTop - clientHeight;
+    
+    // Show button if more than 100px from bottom
+    setShowScrollButton(distanceFromBottom > 100);
+  }, []);
+
+  // Scroll to bottom function
+  const scrollToBottom = useCallback(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, []);
+
+  // Auto-scroll when new AI messages arrive
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, streamingDraft, toolDrafts]);
@@ -57,33 +76,50 @@ export function MessageList() {
   }
 
   return (
-    <div className="space-y-4 p-4">
-      {messages
-        .filter(msg => msg.role !== 'tool') // Hide tool messages from permanent display
-        .map((msg) => (
-          <MessageBubble 
-            key={msg.id} 
-            message={msg} 
-          />
-        ))}
-      {/* Inline typing bubble for assistant draft */}
-      {streamingDraft && streamingDraft.threadId === currentThreadId && (
-        <div className="flex gap-3 items-start">
-          <div className="flex-1 w-full rounded-xl p-4 shadow-sm" style={{ backgroundColor: 'var(--assistant-message-bg)', color: 'var(--assistant-message-text)' }}>
-            <p className="text-sm whitespace-pre-wrap">{streamingDraft.text}</p>
+    <div className="relative h-full">
+      <div 
+        ref={scrollContainerRef}
+        onScroll={handleScroll}
+        className="space-y-4 p-4 h-full overflow-y-auto"
+      >
+        {messages
+          .filter(msg => msg.role !== 'tool') // Hide tool messages from permanent display
+          .map((msg) => (
+            <MessageBubble 
+              key={msg.id} 
+              message={msg} 
+            />
+          ))}
+        {/* Inline typing bubble for assistant draft */}
+        {streamingDraft && streamingDraft.threadId === currentThreadId && (
+          <div className="flex gap-3 items-start">
+            <div className="flex-1 w-full rounded-xl p-4 shadow-sm" style={{ backgroundColor: 'var(--assistant-message-bg)', color: 'var(--assistant-message-text)' }}>
+              <p className="text-sm whitespace-pre-wrap">{streamingDraft.text}</p>
+            </div>
           </div>
-        </div>
-      )}
+        )}
 
-      {/* Inline tool execution drafts (no artifacts here) */}
-      {toolDrafts
-        .filter((t) => t.threadId === currentThreadId)
-        .map((t, idx) => (
-          <ToolCallBubble key={`tool-draft-${idx}-${t.name}`} name={t.name} input={t.input} />
-        ))}
-      
-      {/* Invisible anchor for auto-scroll */}
-      <div ref={messagesEndRef} />
+        {/* Inline tool execution drafts (no artifacts here) */}
+        {toolDrafts
+          .filter((t) => t.threadId === currentThreadId)
+          .map((t, idx) => (
+            <ToolCallBubble key={`tool-draft-${idx}-${t.name}`} name={t.name} input={t.input} />
+          ))}
+        
+        {/* Invisible anchor for scroll target */}
+        <div ref={messagesEndRef} />
+      </div>
+
+      {/* Scroll to bottom button */}
+      {showScrollButton && (
+        <button
+          onClick={scrollToBottom}
+          className="absolute bottom-4 right-4 p-3 bg-white/90 dark:bg-slate-800/90 backdrop-blur-sm border border-gray-200/50 dark:border-slate-700/50 rounded-full shadow-lg hover:shadow-xl hover:bg-white dark:hover:bg-slate-800 transition-all duration-300 ease-out flex items-center justify-center group hover:scale-110 active:scale-95"
+          title="Scroll to bottom"
+        >
+          <ArrowDown size={18} className="text-gray-600 dark:text-slate-300 group-hover:text-gray-800 dark:group-hover:text-slate-100 transition-colors duration-200" />
+        </button>
+      )}
     </div>
   );
 }
@@ -142,7 +178,13 @@ function formatParams(value: any): string {
   try {
     if (Array.isArray(value)) return value.map(String).join(', ');
     if (typeof value === 'object') {
-      return Object.entries(value)
+      // Filter out tool_call_id and other internal metadata
+      const filteredEntries = Object.entries(value)
+        .filter(([k]) => k !== 'tool_call_id');
+      
+      if (filteredEntries.length === 0) return '';
+      
+      return filteredEntries
         .map(([k, v]) => `${k}: ${typeof v === 'object' ? JSON.stringify(v) : String(v)}`)
         .join(' · ');
     }

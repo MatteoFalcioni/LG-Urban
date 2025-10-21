@@ -73,7 +73,11 @@ export function MessageInput() {
     onToken: (content) => {
       // Accumulate token chunks for assistant message
       streamingRef.current = streamingRef.current + content;
-      if (currentThreadId) setDraft(currentThreadId, streamingRef.current);
+      if (currentThreadId) {
+        setDraft(currentThreadId, streamingRef.current);
+        // Clear all tool drafts when assistant starts responding
+        clearToolDrafts(currentThreadId);
+      }
     },
     onToolStart: (name, input) => {
       console.log(`Tool started: ${name}`, input);
@@ -82,8 +86,10 @@ export function MessageInput() {
     onToolEnd: (name, output, artifacts) => {
       console.log(`Tool finished: ${name}`, output, artifacts);
       if (currentThreadId) {
-        // Always remove tool draft when complete
-        removeToolDraft(currentThreadId, name);
+        // Add a longer minimum display time so users can see all tools
+        setTimeout(() => {
+          removeToolDraft(currentThreadId, name);
+        }, 1000); // 1 second minimum display time
         
         // Show artifacts immediately during streaming
         if (artifacts && artifacts.length > 0) {
