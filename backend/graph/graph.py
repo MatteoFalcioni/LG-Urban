@@ -10,6 +10,7 @@ from pydantic import SecretStr
 from dotenv import load_dotenv
 import os
 
+from backend.graph.summarizer_prompt import summarizer_prompt
 from backend.graph.prompt import PROMPT
 from backend.graph.tools import internet_search, make_code_sandbox
 from backend.graph.api_tools import (
@@ -126,7 +127,7 @@ def make_graph(model_name: str | None = None, temperature: float | None = None, 
         model=llm,
         tools=[
             # Core tools
-            internet_search,
+            # internet_search,
             code_sandbox,
             # Bologna OpenData API tools
             list_catalog_tool,
@@ -151,7 +152,7 @@ def make_graph(model_name: str | None = None, temperature: float | None = None, 
 
     # summarization agent
     # Use same API key configuration as main LLM for gpt-4o-mini
-    summarizer_kwargs = {"model": "gpt-4o-mini", "temperature": 0.0}
+    summarizer_kwargs = {"model": "gpt-4.1", "temperature": 0.0}
     if user_api_keys and user_api_keys.get('openai_key'):
         summarizer_kwargs['api_key'] = SecretStr(user_api_keys['openai_key'])
     elif os.getenv('OPENAI_API_KEY'):
@@ -160,7 +161,7 @@ def make_graph(model_name: str | None = None, temperature: float | None = None, 
     agent_summarizer = create_react_agent(
         model=ChatOpenAI(**summarizer_kwargs),
         tools=[],
-        prompt="You are a helpful AI assistant that summarizes conversations.",  
+        prompt=summarizer_prompt,  
         name="agent_summarizer",
         state_schema=MyState,
     )
