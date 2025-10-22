@@ -688,6 +688,79 @@ async def post_message_stream(
         await session.rollback()
         raise HTTPException(status_code=409, detail="Duplicate message_id")
     
+    # Auto-title after first user message (async, best-effort)
+    # This runs in background and won't block the response stream
+    async def auto_title_from_first_message():
+        try:
+            from langchain_openai import ChatOpenAI
+            from langchain_core.prompts import ChatPromptTemplate
+            from langchain_core.output_parsers import StrOutputParser
+            from pydantic import SecretStr
+            import os
+            from backend.db.session import ASYNC_SESSION_MAKER
+            
+            async with ASYNC_SESSION_MAKER() as title_sess:
+                thread_check = await title_sess.get(Thread, t.id)
+                if not thread_check or thread_check.title != "New chat":
+                    return  # Already titled or thread not found
+                
+                # Check if this is the first user message
+                stmt = (
+                    select(Message)
+                    .where(Message.thread_id == thread_check.id)
+                    .where(Message.role == "user")
+                )
+                res = await title_sess.execute(stmt)
+                user_messages = res.scalars().all()
+                
+                if len(user_messages) != 1:
+                    return  # Not the first message
+                
+                logging.info(f"Auto-titling thread {t.id} based on first user message")
+                
+                # Get the first user message content
+                first_msg = user_messages[0]
+                user_text = extract_text_from_content(first_msg.content)
+                
+                if not user_text.strip():
+                    logging.warning("No content to generate title from")
+                    return
+                
+                # Get user API keys
+                user_api_keys = await get_user_api_keys_for_llm(t.user_id, title_sess)
+                
+                # Configure LLM with user's API key if available
+                llm_kwargs = {"model": "gpt-4o-mini", "temperature": 0}
+                if user_api_keys and user_api_keys.get('openai_key'):
+                    llm_kwargs['api_key'] = SecretStr(user_api_keys['openai_key'])
+                    logging.info("Using user's OpenAI API key for titling")
+                elif os.getenv('OPENAI_API_KEY'):
+                    llm_kwargs['api_key'] = SecretStr(os.getenv('OPENAI_API_KEY'))
+                    logging.info("Using environment OpenAI API key for titling")
+                else:
+                    logging.warning("No OpenAI API key available for titling")
+                    return
+                
+                llm = ChatOpenAI(**llm_kwargs)
+                prompt = ChatPromptTemplate.from_messages([
+                    ("system", "Return a concise, engaging title based on the user's request. No quotes, <= 8 words."),
+                    ("user", "User message:\n{body}\n\nTitle:")
+                ])
+                chain = prompt | llm | StrOutputParser()
+                new_title = chain.invoke({"body": user_text})
+                logging.info(f"Generated title: {new_title}")
+                thread_check.title = new_title
+                await title_sess.commit()
+                
+                return new_title
+        except Exception as e:
+            logging.error(f"Auto-title failed for thread {t.id}: {e}", exc_info=True)
+            return None
+    
+    # Start auto-titling in background (don't await it)
+    import asyncio
+    title_task = asyncio.create_task(auto_title_from_first_message())
+    
     # Stream LangGraph agent response via SSE
     async def event_stream():
         from backend.main import get_thread_lock
@@ -700,6 +773,14 @@ async def post_message_stream(
         if not _checkpointer_cm:
             yield f"data: {json.dumps({'error': 'Checkpointer not initialized'})}\n\n"
             return
+        
+        # Wait for auto-titling to complete and emit event if successful
+        try:
+            new_title = await title_task
+            if new_title:
+                yield f"data: {json.dumps({'type': 'title_updated', 'title': new_title})}\n\n"
+        except Exception as e:
+            logging.error(f"Failed to get title from background task: {e}")
         
         # Get user API keys for LLM usage
         user_api_keys = await get_user_api_keys_for_llm(t.user_id, session)
@@ -939,62 +1020,6 @@ async def post_message_stream(
                     write_sess.add(a_msg)
                     await write_sess.commit()
                     a_msg_id = str(a_msg.id)
-
-                # Auto-title in a separate short-lived session (best-effort)
-                if a_msg_id:
-                    try:
-                        from langchain_openai import ChatOpenAI
-                        from langchain_core.prompts import ChatPromptTemplate
-                        from langchain_core.output_parsers import StrOutputParser
-                        async with ASYNC_SESSION_MAKER() as title_sess:
-                            thread_check = await title_sess.get(Thread, t.id)
-                            if thread_check and thread_check.title == "New chat":
-                                logging.info(f"Auto-titling thread {t.id}")
-                                stmt = (
-                                    select(Message)
-                                    .where(Message.thread_id == thread_check.id)
-                                    .order_by(Message.created_at.asc())
-                                    .limit(4)
-                                )
-                                res = await title_sess.execute(stmt)
-                                messages = res.scalars().all()
-                                thread_text = "\n".join([
-                                    f"{m.role}: {extract_text_from_content(m.content)}"
-                                    for m in messages
-                                ])
-                                
-                                if not thread_text.strip():
-                                    logging.warning("No content to generate title from")
-                                    return
-                                
-                                # Configure LLM with user's API key if available
-                                from pydantic import SecretStr
-                                import os
-                                llm_kwargs = {"model": "gpt-4o-mini", "temperature": 0}
-                                if user_api_keys and user_api_keys.get('openai_key'):
-                                    llm_kwargs['api_key'] = SecretStr(user_api_keys['openai_key'])
-                                    logging.info("Using user's OpenAI API key for titling")
-                                elif os.getenv('OPENAI_API_KEY'):
-                                    llm_kwargs['api_key'] = SecretStr(os.getenv('OPENAI_API_KEY'))
-                                    logging.info("Using environment OpenAI API key for titling")
-                                else:
-                                    logging.warning("No OpenAI API key available for titling")
-                                    return
-                                
-                                llm = ChatOpenAI(**llm_kwargs)
-                                prompt = ChatPromptTemplate.from_messages([
-                                    ("system", "Return a concise, engaging title. No quotes, <= 8 words."),
-                                    ("user", "Text:\n{body}\n\nTitle:")
-                                ])
-                                chain = prompt | llm | StrOutputParser()
-                                new_title = chain.invoke({"body": thread_text})
-                                logging.info(f"Generated title: {new_title}")
-                                thread_check.title = new_title
-                                await title_sess.commit()
-                                # Notify frontend of title update
-                                yield f"data: {json.dumps({'type': 'title_updated', 'title': new_title})}\n\n"
-                    except Exception as e:
-                        logging.error(f"Auto-title failed for thread {t.id}: {e}", exc_info=True)
 
                 yield f"data: {json.dumps({'type': 'done', 'message_id': a_msg_id})}\n\n"
                     
