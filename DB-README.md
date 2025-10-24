@@ -1,6 +1,6 @@
 # Database Architecture
 
-This app uses a **triple-store design** to separate concerns between persistent data, ephemeral state, and file storage.
+This app uses a **dual-store design** with PostgreSQL as the primary database and filesystem blob storage for large files.
 
 ## Overview
 
@@ -8,26 +8,29 @@ This app uses a **triple-store design** to separate concerns between persistent 
 ┌─────────────────────────────────────────────────────────────┐
 │                    LangGraph Application                    │
 └─────────────────────────────────────────────────────────────┘
-                    │           │           │
-        ┌───────────┘           │           └───────────┐
-        │                       │                       │
-        ▼                       ▼                       ▼
-┌──────────────┐      ┌──────────────┐      ┌──────────────┐
-│   SQLite     │      │  PostgreSQL  │      │  Blobstore   │
-│              │      │              │      │ (Filesystem) │
-│ Checkpoints  │      │   Metadata   │      │              │
-│ Graph State  │      │   Messages   │      │ File Bytes   │
-│              │      │   Artifacts  │      │              │
-└──────────────┘      └──────────────┘      └──────────────┘
-   Ephemeral           Source of Truth      Content-Addressed
+                    │           │
+        ┌───────────┘           └───────────┐
+        │                                   │
+        ▼                                   ▼
+┌─────────────────────────────────────────┐ ┌──────────────┐
+│              PostgreSQL                 │ │  Blobstore   │
+│                                         │ │ (Filesystem) │
+│  Main App Tables:                       │ │              │
+│  - threads, messages, artifacts        │ │ File Bytes   │
+│  - configs, user_api_keys               │ │              │
+│                                         │ │              │
+│  LangGraph Checkpoint Tables:           │ │              │
+│  - checkpoints, checkpoint_writes       │ │              │
+│  - checkpoint_blobs                     │ │              │
+└─────────────────────────────────────────┘ └──────────────┘
+        Single Source of Truth              Content-Addressed
 ```
 
 ### Storage Responsibilities
 
 | Store | What | Why |
 |-------|------|-----|
-| **SQLite** | LangGraph checkpoints, agent state | Fast, ephemeral, disposable |
-| **PostgreSQL** | Threads, messages, configs, artifact metadata | Persistent, queryable, relational |
+| **PostgreSQL** | All application data + LangGraph checkpoints | Persistent, queryable, relational, concurrent |
 | **Blobstore** | Artifact file bytes | Efficient, deduplicated, scalable |
 
 ---
@@ -166,6 +169,50 @@ Metadata for files generated/uploaded during conversations.
 
 ---
 
+## LangGraph Checkpoint Tables
+
+These tables are automatically created and managed by LangGraph for conversation state management.
+
+#### **checkpoints**
+Stores conversation state snapshots at each step.
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `thread_id` | String | Conversation identifier |
+| `checkpoint_id` | String | Unique checkpoint identifier |
+| `parent_checkpoint_id` | String | Previous checkpoint (for branching) |
+| `checkpoint` | JSONB | Complete state snapshot |
+| `metadata` | JSONB | Additional checkpoint metadata |
+| `created_at` | Timestamp | Checkpoint creation time |
+
+#### **checkpoint_writes**
+Stores atomic updates to checkpoints.
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `thread_id` | String | Conversation identifier |
+| `checkpoint_id` | String | Associated checkpoint |
+| `task_id` | String | Task identifier |
+| `write` | JSONB | State update data |
+| `created_at` | Timestamp | Write creation time |
+
+#### **checkpoint_blobs**
+Stores large state objects that don't fit in regular columns.
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `thread_id` | String | Conversation identifier |
+| `checkpoint_id` | String | Associated checkpoint |
+| `channel` | String | Channel identifier |
+| `version` | String | Version identifier |
+| `type` | String | Blob type |
+| `blob` | BYTEA | Binary data |
+| `created_at` | Timestamp | Blob creation time |
+
+**Note**: These tables are managed entirely by LangGraph and should not be modified directly.
+
+---
+
 ## Blobstore (Filesystem)
 
 ### Structure
@@ -201,16 +248,24 @@ filename = "report.pdf"
 
 ---
 
-## SQLite Checkpointer
+## LangGraph Checkpointer (PostgreSQL)
 
-**Location**: `/app/checkpoints/.lg_checkpoints.sqlite`
+**Location**: Same PostgreSQL database as main application data
 
 **Purpose**: Stores LangGraph's internal state:
 - Conversation checkpoints
 - Agent state between steps
 - Graph control flow data
 
-**Important**: This is **ephemeral** data. Don't rely on it for persistence. If deleted, conversations continue from PostgreSQL message history. But the agent will not have memory of previous chats, they will only be showed in frontend.
+**Important**: All data is now stored in PostgreSQL for unified management. The checkpointer tables are automatically created and managed by LangGraph.
+
+**Benefits of unified PostgreSQL storage**:
+- **Concurrency**: Multiple agents can run simultaneously without database locks
+- **Scalability**: Better performance with high concurrent user loads
+- **Reliability**: ACID transactions and crash recovery
+- **Unified Backups**: Single backup strategy for all data
+- **Unified Monitoring**: One database to monitor and maintain
+- **Data Relationships**: Can correlate checkpoint data with thread data if needed
 
 ---
 
@@ -292,6 +347,13 @@ backend/db/alembic/versions/
 
 ## Key Design Decisions
 
+### Why Unified PostgreSQL Storage?
+- **Single Source of Truth**: All data in one database
+- **ACID Transactions**: Ensures consistency across app data and checkpoints
+- **Unified Operations**: One database to backup, monitor, and maintain
+- **Better Concurrency**: PostgreSQL handles multiple agents better than SQLite
+- **Production Ready**: No file system dependencies for checkpoints
+
 ### Why UUID Primary Keys?
 - Enables **client-side generation** (no server roundtrip)
 - Avoids coordination issues in distributed systems
@@ -319,7 +381,7 @@ backend/db/alembic/versions/
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `DATABASE_URL` | *(required)* | PostgreSQL connection string |
-| `LANGGRAPH_CHECKPOINT_DB` | `/app/checkpoints/.lg_checkpoints.sqlite` | SQLite checkpointer path |
+| `LANGGRAPH_CHECKPOINT_DB_URL` | `postgresql://postgres:postgres@localhost:5432/chat` | PostgreSQL checkpointer connection string |
 | `BLOBSTORE_DIR` | `/app/blobstore` | Artifact storage directory |
 | `MAX_ARTIFACT_SIZE_MB` | `50` | Max file size per artifact |
 
@@ -340,8 +402,9 @@ Check that:
 ### "Checkpointer connection error"
 Verify:
 ```bash
-docker exec lg_urban_backend ls -la /app/checkpoints/
-# Should show .lg_checkpoints.sqlite
+# Check LangGraph checkpoint tables in PostgreSQL
+docker exec lg_urban_backend psql postgresql://postgres:postgres@db:5432/chat -c "\dt" | grep checkpoint
+# Should show checkpoint tables (checkpoints, checkpoint_writes, checkpoint_blobs)
 ```
 
 ### Reset Everything

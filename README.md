@@ -149,7 +149,7 @@ Open http://localhost in your browser and start chatting!
 └─────┬────────┬──────────┬───────┘
       │        │          │
   ┌───▼──┐  ┌──▼─────┐  ┌─▼───────┐
-  │ PG   │  │ SQLite │  │Blobstore│
+  │ PG   │  │  PG    │  │Blobstore│
   │ DB   │  │Checkpt │  │ (files) │
   └──────┘  └────────┘  └─────────┘
 ```
@@ -159,7 +159,7 @@ Open http://localhost in your browser and start chatting!
 | Store | Contents | Purpose |
 |-------|----------|---------|
 | **PostgreSQL** | Threads, messages, configs, artifact metadata | Source of truth, queryable, relational |
-| **SQLite** | LangGraph checkpoints, agent state | Ephemeral, fast, disposable |
+| **PostgreSQL** | LangGraph checkpoints, agent state | Persistent, concurrent, scalable |
 | **Blobstore** | Artifact bytes (images, CSVs, maps) | Content-addressed, deduplicated, scalable |
 
 ---

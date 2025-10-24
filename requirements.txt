@@ -11,7 +11,8 @@ pytest-asyncio
 langgraph
 langchain-openai
 langchain-anthropic
-langgraph-checkpoint-sqlite
+langgraph-checkpoint-postgres
+psycopg[binary,pool]
 langchain-google-community
 docker
 tavily-python

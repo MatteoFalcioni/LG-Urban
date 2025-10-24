@@ -1,10 +1,10 @@
 from langgraph.types import Command
 from typing_extensions import Literal
-from langgraph.prebuilt import create_react_agent
+from langchain.agents import create_agent
 from langchain_openai import ChatOpenAI
 from langchain_anthropic import ChatAnthropic
 from langgraph.graph import StateGraph, START
-from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
+from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 from langchain_core.messages import SystemMessage, HumanMessage, RemoveMessage
 from pydantic import SecretStr
 from dotenv import load_dotenv
@@ -36,22 +36,21 @@ from backend.graph.state import MyState
 
 load_dotenv()
 
-# LangGraph per-convo memory (sqlite). Use env or fallback to mounted volume.
-DB_PATH = os.getenv("LANGGRAPH_CHECKPOINT_DB", "/app/checkpoints/.lg_checkpoints.sqlite")
+# LangGraph per-convo memory (PostgreSQL). Use env or fallback to localhost.
+DB_URL = os.getenv("LANGGRAPH_CHECKPOINT_DB_URL", "postgresql://postgres:postgres@localhost:5432/chat")
 
 async def get_checkpointer():
     """
-    Initialize checkpointer once at app startup (called from main.py lifespan).
+    Initialize PostgreSQL checkpointer once at app startup (called from main.py lifespan).
     Returns the same checkpointer instance to be reused across all graph invocations.
     """
-    cm_or_obj = AsyncSqliteSaver.from_conn_string(DB_PATH)
-
-    # Old 0.2.x style: context manager (needs __aenter__/__aexit__)
-    if hasattr(cm_or_obj, "__aenter__") and not hasattr(cm_or_obj, "aget_tuple"):
-        saver = await cm_or_obj.__aenter__()         # open it once
-        return saver, cm_or_obj                      # return both to close later
-    else:
-        raise ValueError("New style: direct object")
+    saver = AsyncPostgresSaver.from_conn_string(DB_URL)
+    
+    # Initialize tables on first run (idempotent)
+    await saver.setup()
+    
+    # Return saver and a dummy context manager for compatibility with existing cleanup pattern
+    return saver, saver
 
 
 def make_graph(model_name: str | None = None, temperature: float | None = None, system_prompt: str | None = None, context_window: int | None = None, checkpointer=None, user_api_keys: dict | None = None):
@@ -123,7 +122,7 @@ def make_graph(model_name: str | None = None, temperature: float | None = None, 
     code_sandbox = make_code_sandbox()
     
     # main agent
-    agent = create_react_agent(
+    agent = create_agent(
         model=llm,
         tools=[
             # Core tools
@@ -158,7 +157,7 @@ def make_graph(model_name: str | None = None, temperature: float | None = None, 
     elif os.getenv('OPENAI_API_KEY'):
         summarizer_kwargs['api_key'] = SecretStr(os.getenv('OPENAI_API_KEY'))
     
-    agent_summarizer = create_react_agent(
+    agent_summarizer = create_agent(
         model=ChatOpenAI(**summarizer_kwargs),
         tools=[],
         prompt=summarizer_prompt,  

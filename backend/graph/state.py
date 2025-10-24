@@ -1,4 +1,4 @@
-from langgraph.prebuilt.chat_agent_executor import AgentState
+from langchain.agents import AgentState
 from typing import Annotated
 
 # we add reducers not mainly for conurrency of update, but more to define rules for updates

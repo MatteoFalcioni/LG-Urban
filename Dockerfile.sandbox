@@ -2,7 +2,7 @@
 # Docker image for sandboxed Python code execution
 # Includes common data science libraries and runs a REPL server
 
-FROM python:3.11-slim
+FROM python:3.12-slim
 
 # Install common data science libraries available to user code
 RUN pip install --no-cache-dir \
