@@ -16,7 +16,7 @@ This app uses a **dual-store design** with PostgreSQL as the primary database an
 │              PostgreSQL                 │ │  Blobstore   │
 │                                         │ │ (Filesystem) │
 │  Main App Tables:                       │ │              │
-│  - threads, messages, artifacts        │ │ File Bytes   │
+│  - threads, messages, artifacts         │ │ File Bytes   │
 │  - configs, user_api_keys               │ │              │
 │                                         │ │              │
 │  LangGraph Checkpoint Tables:           │ │              │
