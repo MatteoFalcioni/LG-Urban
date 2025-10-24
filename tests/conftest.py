@@ -13,7 +13,7 @@ from httpx import AsyncClient
 
 # Set test environment variables before importing backend modules
 os.environ["DATABASE_URL"] = "sqlite+aiosqlite:///:memory:"
-os.environ["LANGGRAPH_CHECKPOINT_DB"] = ":memory:"
+os.environ["LANGGRAPH_CHECKPOINT_DB_URL"] = "sqlite+aiosqlite:///:memory:"
 os.environ["OPENAI_API_KEY"] = "test-key"
 os.environ["DEFAULT_MODEL"] = "gpt-4o"
 os.environ["DEFAULT_TEMPERATURE"] = "0.7"
