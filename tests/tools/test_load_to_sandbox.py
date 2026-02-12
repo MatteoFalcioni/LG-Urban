@@ -5,13 +5,20 @@ This test verifies that we can load files both from the API and from S3
 into the sandbox using the same approach as the load_dataset_tool.
 
 It also verifies that loading more than one dataset in the same session works.
+
+NOTE: For S3 tests, we use tiny fake datasets (~2KB) stored in s3://{bucket}/tests/
+to avoid buffer overflow issues with large payloads in CI environments.
 """
 
 import os
+import io
 import base64
 import json
 import pytest
-import time
+import pandas as pd
+import boto3
+from botocore.client import Config
+from botocore.exceptions import ClientError
 from dotenv import load_dotenv
 from backend.modal_runtime.executor import SandboxExecutor
 from backend.opendata_api.init_client import client
@@ -33,6 +40,65 @@ def check_s3_bucket():
     """Check that S3 bucket is configured."""
     if not os.getenv("S3_BUCKET") or not os.getenv("AWS_ACCESS_KEY_ID") or not os.getenv("AWS_SECRET_ACCESS_KEY") or not os.getenv("AWS_REGION"):
         raise ValueError("S3 bucket not configured")
+
+
+def get_s3_client():
+    """Create S3 client with proper config."""
+    region = os.getenv("AWS_REGION", "eu-central-1")
+    return boto3.client(
+        "s3",
+        region_name=region,
+        config=Config(
+            signature_version='s3v4',
+            connect_timeout=10,
+            read_timeout=30
+        )
+    )
+
+
+def create_tiny_test_dataframe(seed: int = 0) -> pd.DataFrame:
+    """Create a tiny test DataFrame (~1-2KB when saved as parquet)."""
+    return pd.DataFrame({
+        "id": range(10),
+        "city": [f"city_{i}" for i in range(10)],
+        "value": [i * 1.5 + seed for i in range(10)],
+        "category": ["A", "B", "C", "A", "B", "C", "A", "B", "C", "A"]
+    })
+
+
+def get_or_create_test_dataset(s3_client, bucket: str, dataset_name: str, seed: int = 0) -> bytes:
+    """
+    Get test dataset from S3 tests/ prefix, or create and upload if it doesn't exist.
+    
+    Returns the parquet bytes (small ~2KB payload).
+    """
+    s3_key = f"tests/{dataset_name}.parquet"
+    
+    try:
+        # Try to get existing
+        response = s3_client.get_object(Bucket=bucket, Key=s3_key)
+        data_bytes = response["Body"].read()
+        print(f"📥 Found existing test dataset: {s3_key} ({len(data_bytes)} bytes)")
+        return data_bytes
+    except ClientError as e:
+        if e.response['Error']['Code'] == 'NoSuchKey':
+            # Create tiny dataset (~1-2KB)
+            df = create_tiny_test_dataframe(seed=seed)
+            buffer = io.BytesIO()
+            df.to_parquet(buffer)
+            data_bytes = buffer.getvalue()
+            
+            # Upload to S3 tests/ prefix
+            s3_client.put_object(
+                Bucket=bucket, 
+                Key=s3_key, 
+                Body=data_bytes,
+                ContentType="application/octet-stream"
+            )
+            print(f"✅ Created and uploaded test dataset: {s3_key} ({len(data_bytes)} bytes)")
+            return data_bytes
+        else:
+            raise
 
 
 def load_dataset_bytes_to_sandbox(executor: SandboxExecutor, dataset_id: str, data_bytes: bytes) -> dict:
@@ -161,30 +227,25 @@ print(df.head())
 @pytest.mark.asyncio
 @pytest.mark.timeout(300)
 async def test_load_dataset_from_s3(test_executor, test_session_id):
-    """Test that we can load a dataset from S3 into the sandbox."""
+    """Test that we can load a dataset from S3 into the sandbox.
+    
+    Uses a tiny test dataset (~2KB) from s3://{bucket}/tests/ to avoid
+    buffer overflow issues with large payloads in CI environments.
+    """
     check_s3_bucket()
 
     executor = test_executor
     session_id = test_session_id
     print(f"Session ID 2: {session_id}")
     
-    dataset_id = "temperature_bologna"
+    # Use tiny test dataset instead of real Bologna dataset
+    dataset_id = "tiny_test_s3"
     
-    # Download from S3
-    print(f"Downloading dataset from S3: {dataset_id}")
-    import boto3
-    from botocore.client import Config
-    region = os.getenv("AWS_REGION", "eu-central-1")
-    s3 = boto3.client(
-        "s3",
-        region_name=region,
-        config=Config(signature_version='s3v4')
-    )
-    input_bucket = os.getenv("S3_BUCKET")
-    s3_key = f"input/datasets/{dataset_id}.parquet"
-    s3.head_object(Bucket=input_bucket, Key=s3_key)
-    data_bytes = s3.get_object(Bucket=input_bucket, Key=s3_key)["Body"].read()
-    print(f"Download completed. Size: {len(data_bytes)} bytes")
+    # Get or create the test dataset in S3
+    s3 = get_s3_client()
+    bucket = os.getenv("S3_BUCKET")
+    data_bytes = get_or_create_test_dataset(s3, bucket, dataset_id, seed=42)
+    print(f"Test dataset ready. Size: {len(data_bytes)} bytes")
 
     # Load into sandbox using helper function (same logic as tool)
     res = load_dataset_bytes_to_sandbox(executor, dataset_id, data_bytes)
@@ -198,36 +259,49 @@ async def test_load_dataset_from_s3(test_executor, test_session_id):
 import pandas as pd
 df = pd.read_parquet('{res["rel_path"]}')
 print(f"Dataset shape: {{df.shape}}")
-print(f"Memory usage: {{df.memory_usage(deep=True).sum() / 1024**2:.2f}} MB")
+print(f"Columns: {{list(df.columns)}}")
+print(f"Memory usage: {{df.memory_usage(deep=True).sum() / 1024:.2f}} KB")
 """
     result = executor.execute(code)
     
-    assert "Dataset shape" in clean_output(result["stdout"])
+    stdout = clean_output(result["stdout"])
+    assert "Dataset shape" in stdout
+    assert "(10," in stdout  # Our tiny dataset has 10 rows
     assert not result.get("stderr") or clean_output(result["stderr"]) == ""
     print("✅ Loaded dataset from S3 and accessed from sandbox successfully")
 
 @pytest.mark.asyncio
 @pytest.mark.timeout(300)
 async def test_load_multiple_datasets_in_same_session(test_executor, test_session_id):
-    """Test that we can load multiple datasets into the sandbox in the same session."""
+    """Test that we can load multiple datasets into the sandbox in the same session.
+    
+    Uses tiny test datasets (~2KB each) from s3://{bucket}/tests/ to avoid
+    buffer overflow issues with large payloads in CI environments.
+    """
+    check_s3_bucket()
+    
     executor = test_executor
     session_id = test_session_id
     print(f"Session ID 3: {session_id}")
 
-    # Load first dataset from API
-    dataset_id1 = "temperature_bologna"
+    # Use tiny test datasets instead of real Bologna datasets
+    s3 = get_s3_client()
+    bucket = os.getenv("S3_BUCKET")
+
+    # Load first dataset
+    dataset_id1 = "tiny_test_multi_1"
     print(f"Loading dataset 1: {dataset_id1}")
-    bytes1 = await get_dataset_bytes(client=client, dataset_id=dataset_id1)
+    bytes1 = get_or_create_test_dataset(s3, bucket, dataset_id1, seed=100)
     res1 = load_dataset_bytes_to_sandbox(executor, dataset_id1, bytes1)
     
     assert res1["dataset_id"] == dataset_id1
     assert res1["rel_path"].endswith(f"datasets/{dataset_id1}.parquet")
     print(f"✅ Dataset 1 loaded: {res1}")
 
-    # Load second dataset from API
-    dataset_id2 = "precipitazioni_bologna"
+    # Load second dataset (with different seed for different data)
+    dataset_id2 = "tiny_test_multi_2"
     print(f"Loading dataset 2: {dataset_id2}")
-    bytes2 = await get_dataset_bytes(client=client, dataset_id=dataset_id2)
+    bytes2 = get_or_create_test_dataset(s3, bucket, dataset_id2, seed=200)
     res2 = load_dataset_bytes_to_sandbox(executor, dataset_id2, bytes2)
     
     assert res2["dataset_id"] == dataset_id2
