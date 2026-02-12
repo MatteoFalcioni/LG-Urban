@@ -20,6 +20,8 @@ class SandboxExecutor:
 
         self.session_id = session_id
         self.env = env or {}
+        # Ensure unbuffered I/O inside sandbox (critical for CI/CD environments)
+        self.env.setdefault("PYTHONUNBUFFERED", "1")
         
         print(f"[EXECUTOR] Initializing for session {session_id}")
         

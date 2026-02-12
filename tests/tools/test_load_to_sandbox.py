@@ -17,6 +17,8 @@ from backend.modal_runtime.executor import SandboxExecutor
 from backend.opendata_api.init_client import client
 from backend.opendata_api.helpers import get_dataset_bytes
 
+from conftest import clean_output
+
 load_dotenv()
 
 
@@ -150,8 +152,9 @@ print(df.head())
     result = executor.execute(code)
     
     assert "stdout" in result
-    assert "shape" in result["stdout"].lower() or "loaded dataset" in result["stdout"].lower()
-    assert not result.get("stderr") or result["stderr"] == ""
+    stdout = clean_output(result["stdout"])
+    assert "shape" in stdout.lower() or "loaded dataset" in stdout.lower()
+    assert not result.get("stderr") or clean_output(result["stderr"]) == ""
     
     print("✅ Loaded dataset from API and accessed from sandbox successfully")
 
@@ -199,8 +202,8 @@ print(f"Memory usage: {{df.memory_usage(deep=True).sum() / 1024**2:.2f}} MB")
 """
     result = executor.execute(code)
     
-    assert "Dataset shape" in result["stdout"]
-    assert not result.get("stderr") or result["stderr"] == ""
+    assert "Dataset shape" in clean_output(result["stdout"])
+    assert not result.get("stderr") or clean_output(result["stderr"]) == ""
     print("✅ Loaded dataset from S3 and accessed from sandbox successfully")
 
 @pytest.mark.asyncio
@@ -249,7 +252,8 @@ print("Both datasets loaded successfully!")
 
     result = executor.execute(code)
     assert "stdout" in result
-    assert "shape" in result["stdout"].lower()
-    assert "both datasets loaded successfully" in result["stdout"].lower()
-    assert not result.get("stderr") or result["stderr"] == ""
+    stdout = clean_output(result["stdout"])
+    assert "shape" in stdout.lower()
+    assert "both datasets loaded successfully" in stdout.lower()
+    assert not result.get("stderr") or clean_output(result["stderr"]) == ""
     print("✅ Both datasets accessible from sandbox successfully")

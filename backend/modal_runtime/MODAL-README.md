@@ -6,7 +6,7 @@ We assume that the ability to execute python code with context knowledge and com
 
 ## Implementation Details
 
-Following [Modal's documentation](\link) we first create an **app** in [app.py](./app.py)
+Following [Modal's documentation](https://modal.com/docs) we first create an **app** in [app.py](./app.py)
 
 ```python
 app = modal.App("lg-urban-executor")
@@ -14,13 +14,19 @@ app = modal.App("lg-urban-executor")
 
 and a **driver** in [driver.py](./driver.py). 
 
-**CRUCIAL**: you need to deploy these objects into the cloud with modal deploy backend/modal_runtime/app.py
+**CRUCIAL**: you need to deploy these objects into the cloud with 
+
+```bash
+
+modal deploy backend/modal_runtime/app.py
+
+```
 
 The purpose of this driver is to be always running while the sandbox exist, in order to keep it warm, and to redirect code input with stdin/stdout: it can do this since the driver is running *inside the sandbox*.
 
 Furthermore, it also: 
 - mantains the sandbox stateful by updating the `globals` dictionary with the local variables produced at each run;
-- scans the work directory for produced artifacts (*except for datasets: those are handled in tools) and uploads them to S3 directly from inside the sandbox using `boto3`.
+- scans the work directory for produced artifacts and uploads them to S3 directly from inside the sandbox using `boto3`.
 
 S3 specifics:
 - The bucket name is read from the `S3_BUCKET` env var inside the sandbox.
@@ -66,25 +72,6 @@ Inside the [tests/](./tests/) folder we wrote basic tests to check the implement
   - Uses a temporary `ARTIFACTS_DIR` to avoid uploading to S3 during the test
 
 - `test_code_exec.py`: tests the full `SandboxExecutor` class (instantiation, execution, and termination).
-
-### Run tests
-
-```bash
-cd backend/modal_runtime
-
-# (opzionale) creare un venv e installare pytest
-# python -m venv .venv && source .venv/bin/activate
-# pip install -r ../requirements.txt pytest
-
-# Eseguire tutti i test
-pytest -q
-
-# Eseguire solo i test del driver artifacts
-pytest -q tests/test_driver_artifacts.py
-
-# Eseguire solo l'e2e del driver
-pytest -q tests/test_driver_e2e.py
-```
 
 
 

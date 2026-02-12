@@ -6,10 +6,20 @@ directly inside the sandbox, rather than trying to read files from
 a separate Modal function.
 """
 import os
+import re
 import pytest
 from dotenv import load_dotenv
 
 load_dotenv()
+
+
+def clean_output(raw_text: str) -> str:
+    """Strip ANSI escape codes and normalize line endings for CI/CD compatibility."""
+    if not raw_text:
+        return ""
+    ansi_escape = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
+    text = ansi_escape.sub('', raw_text)
+    return text.replace('\r\n', '\n').replace('\r', '\n').strip()
 
 
 @pytest.mark.timeout(300)
@@ -51,9 +61,11 @@ print(f"File exists: {file_path.exists()}")
         
         result1 = executor.execute(create_code)
         print("Create result:", result1)
-        assert result1["stderr"] == "" or "FutureWarning" in result1["stderr"]
-        assert "Created dataset at:" in result1["stdout"]
-        assert "File exists: True" in result1["stdout"]
+        stderr = clean_output(result1["stderr"])
+        stdout = clean_output(result1["stdout"])
+        assert stderr == "" or "FutureWarning" in stderr
+        assert "Created dataset at:" in stdout
+        assert "File exists: True" in stdout
         
         # Step 2: Export the dataset from inside the sandbox
         # We'll test with and without S3 credentials
@@ -203,7 +215,7 @@ df.to_parquet('datasets/tool_test.parquet')
 print("Dataset created")
 """
         result = executor.execute(create_code)
-        assert "Dataset created" in result["stdout"]
+        assert "Dataset created" in clean_output(result["stdout"])
         print(f"✓ Dataset created in session {session_id}")
         
         # Step 2: Use the export_dataset_tool

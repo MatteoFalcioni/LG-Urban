@@ -3,6 +3,8 @@ import pytest
 from dotenv import load_dotenv
 import uuid
 
+from conftest import clean_output
+
 load_dotenv()
 
 
@@ -25,8 +27,8 @@ def test_modal_sandbox_executor_e2e():
     try:
         # 1) First run: basic stdout and state initialization
         r1 = execu.execute("x = 2\nprint('boot')")
-        assert r1["stderr"] == ""
-        assert "boot" in r1["stdout"]
+        assert clean_output(r1["stderr"]) == ""
+        assert "boot" in clean_output(r1["stdout"])
 
         # 2) Second run: stateful use of x, artifact creation, stdout check
         code = (
@@ -36,9 +38,9 @@ def test_modal_sandbox_executor_e2e():
             "print('ready')\n"
         )
         r2 = execu.execute(code)
-        assert r2["stderr"] == ""
-        assert "7" in r2["stdout"]  # 2 + 5
-        assert "ready" in r2["stdout"]
+        assert clean_output(r2["stderr"]) == ""
+        assert "7" in clean_output(r2["stdout"])  # 2 + 5
+        assert "ready" in clean_output(r2["stdout"])
         assert isinstance(r2.get("artifacts"), list)
         # If artifacts found, at least our artifact.txt should be there
         if r2["artifacts"]:

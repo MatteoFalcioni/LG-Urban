@@ -22,6 +22,8 @@ import io
 from unittest.mock import Mock
 from dotenv import load_dotenv
 
+from conftest import clean_output
+
 from backend.graph.context import set_thread_id, get_thread_id
 from backend.graph.tools.sandbox_tools import (
     execute_code_tool,
@@ -117,9 +119,10 @@ class TestExecuteCodeTool:
         print(f"📊 Result: {result}")
         
         assert "stdout" in result
-        assert "Result: 4" in result["stdout"] or "4" in result["stdout"]
+        stdout = clean_output(result["stdout"])
+        assert "Result: 4" in stdout or "4" in stdout
         # Should not have errors
-        assert not result.get("stderr") or result["stderr"] == ""
+        assert not result.get("stderr") or clean_output(result["stderr"]) == ""
     
     @pytest.mark.skipif(not _have_modal_tokens(), reason="Modal tokens not configured")
     @pytest.mark.timeout(180)
@@ -133,7 +136,7 @@ class TestExecuteCodeTool:
         result1 = json.loads(command1.update["messages"][0].content)
         
         print(f"📊 First execution: {result1}")
-        assert "Set x to 42" in result1["stdout"]
+        assert "Set x to 42" in clean_output(result1["stdout"])
         
         # Second execution: use the variable (proves state persisted)
         code2 = "print(f'x + 1 = {x + 1}')"
@@ -141,7 +144,7 @@ class TestExecuteCodeTool:
         result2 = json.loads(command2.update["messages"][0].content)
         
         print(f"📊 Second execution: {result2}")
-        assert "x + 1 = 43" in result2["stdout"]
+        assert "x + 1 = 43" in clean_output(result2["stdout"])
     
     @pytest.mark.skipif(not _have_modal_tokens(), reason="Modal tokens not configured")
     @pytest.mark.timeout(180)
@@ -160,7 +163,7 @@ print(df.to_string())
         result = json.loads(command.update["messages"][0].content)
         
         print(f"📊 Result: {result}")
-        assert "DataFrame shape: (3, 2)" in result["stdout"]
+        assert "DataFrame shape: (3, 2)" in clean_output(result["stdout"])
     
     @pytest.mark.skipif(not _have_modal_tokens(), reason="Modal tokens not configured")
     @pytest.mark.timeout(180)
@@ -176,7 +179,7 @@ print(df.to_string())
         print(f"📊 Error result: {result}")
         # Should have stderr with error message
         assert "stderr" in result
-        assert "division by zero" in result["stderr"].lower()
+        assert "division by zero" in clean_output(result["stderr"]).lower()
 
 @pytest.mark.asyncio
 class TestExecutorCacheManagement:
@@ -312,11 +315,12 @@ print(f'Cities: {{", ".join(df["city"].tolist())}}')
         if exec_result.get('stderr'):
             print(f"⚠️  Stderr:\n{exec_result['stderr']}")
         
-        # Verify calculations
-        assert exec_result['stdout'], f"Expected stdout but got empty. stderr: {exec_result.get('stderr')}"
-        assert "Total population: 6,059,000" in exec_result["stdout"]
-        assert "Largest city: Roma" in exec_result["stdout"]
-        assert "Milano" in exec_result["stdout"]
+        # Verify calculations (use clean_output to handle CI/CD ANSI differences)
+        stdout = clean_output(exec_result['stdout'])
+        assert stdout, f"Expected stdout but got empty. stderr: {exec_result.get('stderr')}"
+        assert "Total population: 6,059,000" in stdout
+        assert "Largest city: Roma" in stdout
+        assert "Milano" in stdout
         
         # 4. Export dataset to S3 and verify
         print(f"📤 Step 4: Exporting dataset to S3...")

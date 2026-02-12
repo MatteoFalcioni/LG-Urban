@@ -461,18 +461,9 @@ def make_graph(
     # ======= GRAPH  BUILDING =======
 
     builder = StateGraph(MyState)
-
-    async def supervisor_node(state: MyState):
-        print("[GRAPH] Entering supervisor_node")
-
-        result = await supervisor_agent.ainvoke(state)
-        # Supervisor returns a Command, so we just return it
-        print("[GRAPH] Supervisor completed step")
-        return result
-        # supervisor with tool for rerouting is interpreted as error but its not
-
+        
     builder.add_node(
-        "supervisor", supervisor_node
+        "supervisor", supervisor_agent
     )  # , destinations=("data_analyst", "report_writer", "reviewer", END)
     builder.add_node("data_analyst", analyst_agent_node)
     builder.add_node("report_writer", write_report_node)
