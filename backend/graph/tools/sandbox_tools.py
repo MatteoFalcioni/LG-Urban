@@ -245,7 +245,6 @@ print(json.dumps(result))
     except (json.JSONDecodeError, KeyError) as e:
         # If check fails, continue to load anyway
         print(f"Check failed for dataset {dataset_id}; error: {e}. Continuing to load...")
-        raise e
 
     # If not, load from S3 or API
     try:
