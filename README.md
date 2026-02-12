@@ -2,7 +2,7 @@
 
 **AI-powered urban data analysis platform for Bologna with sandboxed Python execution.**
 
-Built on LangGraph, this production-ready application combines conversational AI with secure code execution, civic dataset integration, and geographic visualization tools, enabling users to perform comprehensive data analysis on any datasets from [Bologna's OpenData](https://opendata.comune.bologna.it/).
+Built on LangGraph, this application enables users to perform comprehensive data analysis on any datasets from [Bologna's OpenData](https://opendata.comune.bologna.it/).
 
 🚀 **Now deployed on Railway** [[live demo](https://lg-urban-frontend-production.up.railway.app/)]
 
@@ -15,30 +15,24 @@ Built on LangGraph, this production-ready application combines conversational AI
 - Automatic context summarization when context window is exceeded
 - PostgreSQL-backed persistence with full message history
 - Per-thread LLM configuration (model, temperature, system prompt)
-- Support for GPT and Claude models
+- Support for any OpenRouter llm
 
 ### 🐍 Modal Sandbox Code Execution
 - Sandboxed Python execution leveraging [Modal.com](https://modal.com)
 - Live download of datasets from Bologna's OpenData (constant updates)
-- S3 integration for heavy datasets that cannot be downloaded via API
+- S3 integration for datasets caching
 - Secure, isolated environment for untrusted code
 - Real-time artifact generation (plots, CSVs, analysis results)
 
 ### 🛡️ Hallucination Mitigation
 - **Reviewer agent** evaluates data analyst's work and grades quality
-- Only accepts analysis with normalized scores **≥ 6/10**
+- Only accepts analysis without any hallucinations from the analyst
 - Failed analyses trigger constructive critique and re-prompting
 - Ensures reliability and accuracy of insights
 
 ### 📊 Report Writing
 - AI-generated comprehensive reports from analysis results
 - Human-in-the-loop approval workflow
-
-### 🗺️ Geographic Visualization
-- Interactive map integration for Bologna's geospatial data
-- Coordinate-based queries and filtering
-- Bounding box support for area-specific analysis
-- Visual overlay of civic datasets on maps
 
 ### 🎨 Modern UI
 - **React + TypeScript** frontend with Tailwind CSS
@@ -75,7 +69,7 @@ cp .env.template .env
 
 Required variables:
 - `DATABASE_URL` - PostgreSQL connection string
-- `OPENAI_API_KEY` or `ANTHROPIC_API_KEY` - For LLM access
+- `OPENROUTER_API_KEY` - For LLM access
 - `MODAL_TOKEN_ID` / `MODAL_TOKEN_SECRET` - For sandbox execution
 - `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` - For S3 storage
 - `CLERK_SECRET_KEY` / `VITE_CLERK_PUBLISHABLE_KEY` - For authentication
@@ -178,7 +172,7 @@ See [`backend/db/DB-README.md`](./backend/db/DB-README.md) for detailed schema, 
 - **Clerk** - Authentication provider
 
 ### AI/LLM
-- **OpenAI** (GPT) / **Anthropic** (Claude) - Language models
+- **OpenRouter** - Language models
 - **LangChain** - LLM integration utilities
 
 ### DevOps & CI/CD
