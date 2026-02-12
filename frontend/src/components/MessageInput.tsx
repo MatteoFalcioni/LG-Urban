@@ -56,8 +56,8 @@ export function MessageInput() {
   const clearArtifactBubbles = useChatStore((state) => state.clearArtifactBubbles);
   const setContextUsage = useChatStore((state) => state.setContextUsage);
   
-  // Check if user has any API keys configured
-  const hasApiKeys = Boolean(apiKeys.openai || apiKeys.anthropic);
+  // Check if user has OpenRouter API key configured
+  const hasApiKeys = Boolean(apiKeys.openrouter);
 
   // Update thread state when thread changes
   useEffect(() => {

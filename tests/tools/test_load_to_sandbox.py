@@ -14,6 +14,7 @@ import os
 import io
 import base64
 import json
+import uuid
 import pytest
 import pandas as pd
 import boto3
@@ -163,10 +164,14 @@ print(json.dumps(files))
     return json.loads(stdout) if stdout else []
 
 # --- fixtures ---
-@pytest.fixture(scope="module")
+@pytest.fixture(scope="function")
 def test_session_id():
-    """Create a single test session ID shared across all tests in this module."""
-    session_id = "test-load-to-sandbox-session"
+    """Create a unique test session ID for each test function.
+    
+    Using function scope because the executor/driver becomes unresponsive
+    after being used in CI environments. Each test gets a fresh session.
+    """
+    session_id = f"test-load-{uuid.uuid4().hex[:8]}"
     yield session_id
     # Cleanup: terminate executor if created
     print(f"\n🧹 Cleaning up test session: {session_id}")
@@ -175,9 +180,14 @@ def test_session_id():
     _executor_cache.pop(session_id, None)
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture(scope="function")
 def test_executor(test_session_id):
-    """Create a single executor shared across all tests in this module."""
+    """Create a fresh executor for each test function.
+    
+    Using function scope because the executor/driver becomes unresponsive
+    after being used once in CI environments (GitHub Actions).
+    This is slower but more reliable.
+    """
     check_modal_tokens()  # Check before creating executor
     executor = SandboxExecutor(session_id=test_session_id)
     yield executor
@@ -190,7 +200,7 @@ async def test_load_dataset_from_api(test_executor, test_session_id):
     """Test that we can load a dataset from the API into the sandbox."""
     executor = test_executor
     session_id = test_session_id
-    print(f"Session ID 1: {session_id}")
+    print(f"Session: {session_id}")
 
     dataset_id = "temperature_bologna"
     
@@ -236,7 +246,7 @@ async def test_load_dataset_from_s3(test_executor, test_session_id):
 
     executor = test_executor
     session_id = test_session_id
-    print(f"Session ID 2: {session_id}")
+    print(f"Session: {session_id}")
     
     # Use tiny test dataset instead of real Bologna dataset
     dataset_id = "tiny_test_s3"
@@ -282,7 +292,7 @@ async def test_load_multiple_datasets_in_same_session(test_executor, test_sessio
     
     executor = test_executor
     session_id = test_session_id
-    print(f"Session ID 3: {session_id}")
+    print(f"Session: {session_id}")
 
     # Use tiny test datasets instead of real Bologna datasets
     s3 = get_s3_client()
