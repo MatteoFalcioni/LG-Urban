@@ -23,9 +23,9 @@ export function ApiKeyWarning() {
         return;
       }
       
-      // Check if any keys exist in the store
-      const hasKeys = apiKeys.openai || apiKeys.anthropic;
-        setShowWarning(!hasKeys);
+      // Check if OpenRouter key exists in the store
+      const hasKey = apiKeys.openrouter;
+        setShowWarning(!hasKey);
         setIsChecking(false);
     }, 500); // Small delay to let the loader hook finish
 
@@ -50,8 +50,8 @@ export function ApiKeyWarning() {
 
         {/* Message */}
         <p className="text-gray-600 dark:text-slate-300 mb-6">
-          To use this application, you need to provide at least one API key (OpenAI or Anthropic). 
-          Your keys are encrypted and stored securely.
+          To use this application, you need to provide an OpenRouter API key. 
+          Your key is encrypted and stored securely.
         </p>
 
         {/* Action Button */}
@@ -65,7 +65,15 @@ export function ApiKeyWarning() {
 
         {/* Info text */}
         <p className="text-sm text-gray-500 dark:text-slate-400 mt-4 text-center">
-          You'll need an OpenAI or Anthropic API key to continue.
+          Get your free API key at{' '}
+          <a 
+            href="https://openrouter.ai/keys" 
+            target="_blank" 
+            rel="noopener noreferrer"
+            className="text-blue-500 hover:text-blue-600 underline"
+          >
+            openrouter.ai
+          </a>
         </p>
       </div>
     </div>

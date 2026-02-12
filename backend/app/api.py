@@ -42,6 +42,8 @@ async def get_user_api_keys_for_llm(user_id: str, session: AsyncSession) -> dict
             keys["openai_key"] = decrypt_api_key(user_keys.openai_key)
         if user_keys.anthropic_key:
             keys["anthropic_key"] = decrypt_api_key(user_keys.anthropic_key)
+        if user_keys.openrouter_key:
+            keys["openrouter_key"] = decrypt_api_key(user_keys.openrouter_key)
 
         return keys if keys else None
     except Exception:
@@ -2725,11 +2727,13 @@ async def resume_thread(
 class APIKeysRequest(BaseModel):
     openai_key: Optional[str] = None
     anthropic_key: Optional[str] = None
+    openrouter_key: Optional[str] = None
 
 
 class APIKeysResponse(BaseModel):
     openai_key: Optional[str] = None  # Masked version
     anthropic_key: Optional[str] = None  # Masked version
+    openrouter_key: Optional[str] = None  # Masked version
 
 
 @router.get("/users/{user_id}/api-keys", response_model=APIKeysResponse)
@@ -2760,7 +2764,12 @@ async def get_user_api_keys(user_id: str, session: AsyncSession = Depends(get_se
             ),
             anthropic_key=(
                 mask_api_key(decrypt_api_key(user_keys.anthropic_key))
-            if user_keys.anthropic_key
+                if user_keys.anthropic_key
+                else None
+            ),
+            openrouter_key=(
+                mask_api_key(decrypt_api_key(user_keys.openrouter_key))
+                if user_keys.openrouter_key
                 else None
             ),
         )
@@ -2801,6 +2810,11 @@ async def save_user_api_keys(
         user_keys.anthropic_key = (
             encrypt_api_key(keys.anthropic_key) if keys.anthropic_key else None
         )
+    
+    if "openrouter_key" in keys.model_fields_set:
+        user_keys.openrouter_key = (
+            encrypt_api_key(keys.openrouter_key) if keys.openrouter_key else None
+        )
 
     await session.commit()
     await session.refresh(user_keys)
@@ -2815,6 +2829,11 @@ async def save_user_api_keys(
         anthropic_key=(
             mask_api_key(decrypt_api_key(user_keys.anthropic_key))
             if user_keys.anthropic_key
+            else None
+        ),
+        openrouter_key=(
+            mask_api_key(decrypt_api_key(user_keys.openrouter_key))
+            if user_keys.openrouter_key
             else None
         ),
     )
@@ -2840,7 +2859,7 @@ async def get_user_api_keys_raw(
         if not user_keys:
             total_time = time.time() - start_time
             logging.info(f"[API-KEYS-RAW] No keys found. Total time: {total_time:.3f}s for user {user_id}")
-            return {"openai_key": None, "anthropic_key": None}
+            return {"openai_key": None, "anthropic_key": None, "openrouter_key": None}
 
         response = {
             "openai_key": (
@@ -2849,6 +2868,11 @@ async def get_user_api_keys_raw(
             "anthropic_key": (
                 decrypt_api_key(user_keys.anthropic_key)
                 if user_keys.anthropic_key
+                else None
+            ),
+            "openrouter_key": (
+                decrypt_api_key(user_keys.openrouter_key)
+                if user_keys.openrouter_key
                 else None
             ),
         }

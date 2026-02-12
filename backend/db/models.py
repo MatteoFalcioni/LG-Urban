@@ -188,6 +188,7 @@ class UserAPIKeys(Base):
     # Encrypted API keys - stored as base64 encoded encrypted strings
     openai_key: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     anthropic_key: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    openrouter_key: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=text("NOW()")

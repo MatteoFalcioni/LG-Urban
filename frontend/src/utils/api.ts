@@ -154,8 +154,7 @@ export async function getThreadState(threadId: string): Promise<{
 // ===== API Key Management =====
 
 export interface APIKeys {
-  openai_key?: string | null;
-  anthropic_key?: string | null;
+  openrouter_key?: string | null;
 }
 
 export async function getUserApiKeys(userId: string): Promise<APIKeys> {

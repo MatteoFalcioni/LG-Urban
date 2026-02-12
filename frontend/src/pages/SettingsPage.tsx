@@ -30,14 +30,8 @@ export function SettingsPage() {
   const [saveStatus, setSaveStatus] = useState<'idle' | 'success' | 'error'>('idle');
   
   // API Keys state
-  const [apiKeyInputs, setApiKeyInputs] = useState({
-    openai: '',
-    anthropic: '',
-  });
-  const [showKeys, setShowKeys] = useState({
-    openai: false,
-    anthropic: false,
-  });
+  const [apiKeyInput, setApiKeyInput] = useState('');
+  const [showKey, setShowKey] = useState(false);
   const [isSavingKeys, setIsSavingKeys] = useState(false);
   const [keysSaveStatus, setKeysSaveStatus] = useState<'idle' | 'success' | 'error'>('idle');
 
@@ -103,16 +97,11 @@ export function SettingsPage() {
       try {
         const keys = await getUserApiKeys(userId);
         // Don't set masked keys in inputs - they're just for display/checking existence
-        // Leave inputs empty so user can enter new keys
-        // Only show placeholder if keys exist
-        setApiKeyInputs({
-          openai: '',
-          anthropic: '',
-        });
-        // Update store to track if keys exist (for warning modal)
+        // Leave input empty so user can enter new key
+        setApiKeyInput('');
+        // Update store to track if key exists (for warning modal)
         setApiKeys({
-          openai: keys.openai_key || null,
-          anthropic: keys.anthropic_key || null,
+          openrouter: keys.openrouter_key || null,
         });
       } catch (err) {
         console.error('Failed to load API keys:', err);
@@ -158,32 +147,24 @@ export function SettingsPage() {
   }
 
   /**
-   * Save API keys
+   * Save API key
    */
   async function handleSaveApiKeys() {
     setIsSavingKeys(true);
     setKeysSaveStatus('idle');
     try {
-      // Only send keys that have been entered (non-empty)
-      const keysToSave: { openai_key?: string | null; anthropic_key?: string | null } = {};
-      if (apiKeyInputs.openai) {
-        keysToSave.openai_key = apiKeyInputs.openai;
-      }
-      if (apiKeyInputs.anthropic) {
-        keysToSave.anthropic_key = apiKeyInputs.anthropic;
+      // Only send key if entered (non-empty)
+      const keysToSave: { openrouter_key?: string | null } = {};
+      if (apiKeyInput) {
+        keysToSave.openrouter_key = apiKeyInput;
       }
       
       await saveUserApiKeys(userId, keysToSave);
       
-      // Update store with the keys that were saved
-      const updates: { openai?: string | null; anthropic?: string | null } = {};
-      if (apiKeyInputs.openai) {
-        updates.openai = apiKeyInputs.openai;
+      // Update store with the key that was saved
+      if (apiKeyInput) {
+        setApiKeys({ openrouter: apiKeyInput });
       }
-      if (apiKeyInputs.anthropic) {
-        updates.anthropic = apiKeyInputs.anthropic;
-      }
-      setApiKeys(updates);
       
       setKeysSaveStatus('success');
       
@@ -192,7 +173,7 @@ export function SettingsPage() {
         navigate('/');
       }, 1500);
     } catch (err) {
-      console.error('Failed to save API keys:', err);
+      console.error('Failed to save API key:', err);
       setKeysSaveStatus('error');
     } finally {
       setIsSavingKeys(false);
@@ -309,7 +290,7 @@ export function SettingsPage() {
               {(config.context_window ?? defaultConfig.context_window ?? 64000) > 64000 && (
                 <div className="mt-2 p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
                   <p className="text-xs text-yellow-800 dark:text-yellow-200">
-                    ⚠️ <strong>Note:</strong> Context windows larger than 64k require your OpenAI and Anthropic accounts to be enabled for extended context. If not enabled, API calls may fail with an error.
+                    ⚠️ <strong>Note:</strong> Context windows larger than 64k may not be supported by all models. Check OpenRouter model documentation for supported context sizes.
                   </p>
                 </div>
               )}
@@ -354,27 +335,35 @@ export function SettingsPage() {
           </div>
         </section>
 
-        {/* API Keys Section */}
+        {/* API Key Section */}
         <section className="bg-white dark:bg-slate-800 rounded-lg border border-gray-200 dark:border-slate-700 p-6">
           <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
             <Key size={18} className="text-gray-600 dark:text-slate-400" />
-            API Keys
+            OpenRouter API Key
           </h2>
 
           <div className="space-y-4">
             <p className="text-sm text-gray-600 dark:text-slate-400">
-              API keys are encrypted and stored securely. Enter a new key to update it, or leave empty to keep the existing one.
+              Your OpenRouter API key is encrypted and stored securely. Get your key from{' '}
+              <a 
+                href="https://openrouter.ai/keys" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="text-blue-500 hover:text-blue-600 underline"
+              >
+                openrouter.ai/keys
+              </a>
             </p>
 
-            {/* OpenAI Key */}
+            {/* OpenRouter Key */}
             <div>
-              <label className="block text-sm font-medium mb-2">OpenAI API Key</label>
+              <label className="block text-sm font-medium mb-2">API Key</label>
               <div className="relative">
                 <input
-                  type={showKeys.openai ? 'text' : 'password'}
-                  value={apiKeyInputs.openai}
-                  onChange={(e) => setApiKeyInputs((prev) => ({ ...prev, openai: e.target.value }))}
-                  placeholder="sk-proj-... (enter new key or leave empty to keep existing)"
+                  type={showKey ? 'text' : 'password'}
+                  value={apiKeyInput}
+                  onChange={(e) => setApiKeyInput(e.target.value)}
+                  placeholder="sk-or-v1-... (enter new key or leave empty to keep existing)"
                   className="w-full px-3 py-2 pr-10 border rounded-lg focus:ring-2 focus:ring-gray-800 dark:focus:ring-gray-600 focus:border-gray-800 dark:focus:border-gray-600 transition-all outline-none"
                   style={{ 
                     border: '1px solid var(--border)', 
@@ -384,58 +373,32 @@ export function SettingsPage() {
                 />
                 <button
                   type="button"
-                  onClick={() => setShowKeys((prev) => ({ ...prev, openai: !prev.openai }))}
+                  onClick={() => setShowKey(!showKey)}
                   className="absolute right-2 top-1/2 -translate-y-1/2 p-1 hover:bg-gray-100 dark:hover:bg-slate-700 rounded"
                 >
-                  {showKeys.openai ? <EyeOff size={16} /> : <Eye size={16} />}
+                  {showKey ? <EyeOff size={16} /> : <Eye size={16} />}
                 </button>
               </div>
             </div>
 
-            {/* Anthropic Key */}
-            <div>
-              <label className="block text-sm font-medium mb-2">Anthropic API Key</label>
-              <div className="relative">
-                <input
-                  type={showKeys.anthropic ? 'text' : 'password'}
-                  value={apiKeyInputs.anthropic}
-                  onChange={(e) => setApiKeyInputs((prev) => ({ ...prev, anthropic: e.target.value }))}
-                  placeholder="sk-ant-... (enter new key or leave empty to keep existing)"
-                  className="w-full px-3 py-2 pr-10 border rounded-lg focus:ring-2 focus:ring-gray-800 dark:focus:ring-gray-600 focus:border-gray-800 dark:focus:border-gray-600 transition-all outline-none"
-                  style={{ 
-                    border: '1px solid var(--border)', 
-                    backgroundColor: 'var(--bg-secondary)', 
-                    color: 'var(--text-primary)'
-                  }}
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowKeys((prev) => ({ ...prev, anthropic: !prev.anthropic }))}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 p-1 hover:bg-gray-100 dark:hover:bg-slate-700 rounded"
-                >
-                  {showKeys.anthropic ? <EyeOff size={16} /> : <Eye size={16} />}
-                </button>
-              </div>
-            </div>
-
-            {/* Save Keys Button */}
+            {/* Save Key Button */}
             <button
               onClick={handleSaveApiKeys}
               disabled={isSavingKeys}
               className="w-full px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg font-medium transition-all duration-200 flex items-center justify-center gap-2 disabled:opacity-50"
             >
               <Save size={16} />
-              {isSavingKeys ? 'Saving...' : 'Save API Keys'}
+              {isSavingKeys ? 'Saving...' : 'Save API Key'}
             </button>
             
             {keysSaveStatus === 'success' && (
               <p className="text-sm text-green-600 dark:text-green-400 text-center">
-                ✓ API keys saved successfully
+                ✓ API key saved successfully
               </p>
             )}
             {keysSaveStatus === 'error' && (
               <p className="text-sm text-red-600 dark:text-red-400 text-center">
-                ✗ Failed to save API keys
+                ✗ Failed to save API key
               </p>
             )}
           </div>

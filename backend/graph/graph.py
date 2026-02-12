@@ -14,6 +14,8 @@ import os
 from datetime import datetime
 from pathlib import Path
 
+from backend.graph.utils import get_openrouter_model
+
 from backend.graph.prompts.summarizer import summarizer_prompt
 from backend.graph.prompts.analyst import PROMPT
 from backend.graph.prompts.report import report_prompt
@@ -95,35 +97,31 @@ def make_graph(
     Create a graph with custom config. Reuses the same checkpointer for all invocations.
 
     Args:
-        model_name: OpenAI model name (e.g., "gpt-4.1"") or Anthropic model name (e.g., "claude-sonnet-4-5")
+        model_name: Model name (e.g., "gpt-4.1", "claude-sonnet-4-5"). 
+                    Automatically converted to OpenRouter format (openai/gpt-4.1, anthropic/claude-sonnet-4-5).
         temperature: Model temperature (0.0-2.0). If None, uses env DEFAULT_TEMPERATURE or model default.
         system_prompt: Custom system prompt. If None, uses default PROMPT.
         context_window: Custom context window. If None, uses env CONTEXT_WINDOW.
         checkpointer: Reused checkpointer instance from app startup.
-        user_api_keys: Dict with 'openai_key' and 'anthropic_key' for user-provided API keys.
+        user_api_keys: Dict with 'openrouter_key' for user-provided OpenRouter API key.
     """
 
     # ======= API KEYS SETUP =======
     # Extract API keys once at the beginning
-    openai_api_key = None
-    if user_api_keys and user_api_keys.get("openai_key"):
-        openai_api_key = SecretStr(user_api_keys["openai_key"])
-    elif os.getenv("OPENAI_API_KEY"):
-        openai_api_key = SecretStr(os.getenv("OPENAI_API_KEY"))
-
-    anthropic_api_key = None
-    if user_api_keys and user_api_keys.get("anthropic_key"):
-        anthropic_api_key = SecretStr(user_api_keys["anthropic_key"])
-    elif os.getenv("ANTHROPIC_API_KEY"):
-        anthropic_api_key = SecretStr(os.getenv("ANTHROPIC_API_KEY"))
+    # Priority: user_api_keys > environment variables
+    openrouter_api_key = None
+    if user_api_keys and user_api_keys.get("openrouter_key"):
+        openrouter_api_key = SecretStr(user_api_keys["openrouter_key"])
+    elif os.getenv("OPENROUTER_API_KEY"):
+        openrouter_api_key = SecretStr(os.getenv("OPENROUTER_API_KEY"))
+    
 
     # ======= SUPERVISOR =======
-    # use gpt-4.1 for supervisor
-    supervisor_llm_kwargs = {"model": "gpt-4.1"}
-    if openai_api_key:
-        supervisor_llm_kwargs["api_key"] = openai_api_key
-
-    supervisor_llm = ChatOpenAI(**supervisor_llm_kwargs)
+    # use gpt-4.1 for supervisor (via OpenRouter)
+    supervisor_llm = get_openrouter_model(
+        model_name="openai/gpt-4.1",
+        api_key=openrouter_api_key
+    )
 
     supervisor_agent = create_agent(
         model=supervisor_llm,
@@ -144,25 +142,24 @@ def make_graph(
     print(
         f"[MODEL] Using model: {model_name} (temperature: {temp if temp is not None else DEFAULT_TEMPERATURE}), context window: {context_window if context_window is not None else CONTEXT_WINDOW}"
     )
-    llm_kwargs = {"model": model_name}
-    if temp is not None:
-        llm_kwargs["temperature"] = temp
-
-    # Use extracted API keys
+    
+    # Convert model name to OpenRouter format if needed
+    # OpenRouter expects format: "provider/model-name"
     if model_name.startswith("gpt-"):
-        if openai_api_key:
-            llm_kwargs["api_key"] = openai_api_key
-
-        llm = ChatOpenAI(
-            **llm_kwargs,
-            stream_usage=True,  # to get usr metadata with astream_events (crucial for token count, but that feature is deprecated)
-        )
+        openrouter_model_name = f"openai/{model_name}"
     elif model_name.startswith("claude-"):
-        # https://docs.claude.com/en/docs/about-claude/models/overview#model-names
-        if anthropic_api_key:
-            llm_kwargs["api_key"] = anthropic_api_key
-
-        llm = ChatAnthropic(**llm_kwargs, stream_usage=True)
+        openrouter_model_name = f"anthropic/{model_name}"
+    else:
+        # Assume it's already in OpenRouter format or a valid model name
+        openrouter_model_name = model_name
+    
+    # Create analyst LLM via OpenRouter
+    llm = get_openrouter_model(
+        model_name=openrouter_model_name,
+        temperature=temp,
+        api_key=openrouter_api_key,
+        stream_usage=True  # to get usr metadata with astream_events (crucial for token count)
+    )
 
     # Use default prompt, + custom prompt as string (LangChain v1.0 expects string, not SystemMessage)
     prompt_text = PROMPT
@@ -195,11 +192,11 @@ def make_graph(
         *report_tools,
     ]
 
-    summarizer_kwargs = {"model": "gpt-4.1"}
-    if openai_api_key:
-        summarizer_kwargs["api_key"] = openai_api_key
-
-    summarizer = ChatOpenAI(**summarizer_kwargs)  # summarizer for middleware
+    # Summarizer for middleware (via OpenRouter)
+    summarizer = get_openrouter_model(
+        model_name="openai/gpt-4.1",
+        api_key=openrouter_api_key
+    )
 
     analyst_agent = create_agent(
         model=llm,
@@ -222,12 +219,11 @@ def make_graph(
     )
 
     # ======= REPORT WRITER AGENT =======
-    # use gpt 4.1 for report writer instead of haiku
-    report_writer_kwargs = {"model": "gpt-4.1"}
-    if openai_api_key:
-        report_writer_kwargs["api_key"] = openai_api_key
-
-    report_writer_llm = ChatOpenAI(**report_writer_kwargs)
+    # use gpt 4.1 for report writer (via OpenRouter)
+    report_writer_llm = get_openrouter_model(
+        model_name="openai/gpt-4.1",
+        api_key=openrouter_api_key
+    )
 
     agent_report_writer = create_agent(
         model=report_writer_llm,
@@ -246,12 +242,11 @@ def make_graph(
     )
 
     # ======= REVIEWER AGENT =======
-    # use gpt-4.1 for reviewer
-    reviewer_kwargs = {"model": "gpt-4.1"}
-    if openai_api_key:
-        reviewer_kwargs["api_key"] = openai_api_key
-
-    reviewer_llm = ChatOpenAI(**reviewer_kwargs)
+    # use gpt-4.1 for reviewer (via OpenRouter)
+    reviewer_llm = get_openrouter_model(
+        model_name="openai/gpt-4.1",
+        api_key=openrouter_api_key
+    )
     agent_reviewer = create_agent(
         model=reviewer_llm,
         tools=[
