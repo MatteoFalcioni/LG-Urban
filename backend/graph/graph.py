@@ -112,29 +112,26 @@ def make_graph(
         openrouter_api_key = SecretStr(user_api_keys["openrouter_key"])
     elif os.getenv("OPENROUTER_API_KEY"):
         openrouter_api_key = SecretStr(os.getenv("OPENROUTER_API_KEY"))
-    
 
     # ======= SUPERVISOR =======
     # use gpt-4.1 for supervisor (via OpenRouter)
     supervisor_llm = get_openrouter_model(
-        model_name="openai/gpt-4.1",
+        model_name="openai/gpt-4.1",  
         api_key=openrouter_api_key
-    )
+    ) 
 
     supervisor_agent = create_agent(
         model=supervisor_llm,
         tools=[assign_to_analyst, assign_to_report_writer, assign_to_reviewer],
         system_prompt=supervisor_prompt,
         name="agent_supervisor",
-        state_schema=MyState,
+        state_schema=MyState, 
     )
 
     # ======= ANALYST AGENT =======
     from backend.config import DEFAULT_MODEL, DEFAULT_TEMPERATURE, CONTEXT_WINDOW
-
-    # Use config or fall back to env defaults
-    model_name = model_name or DEFAULT_MODEL
-    temp = temperature if temperature is not None else DEFAULT_TEMPERATURE
+    model_name = model_name or DEFAULT_MODEL 
+    temp = temperature if temperature is not None else DEFAULT_TEMPERATURE 
     context_window = context_window if context_window is not None else CONTEXT_WINDOW
     effective_context_window = int(context_window * 0.9)  # (90% for safety)
     print(
