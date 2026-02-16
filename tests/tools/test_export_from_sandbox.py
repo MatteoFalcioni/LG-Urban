@@ -6,18 +6,25 @@ directly inside the sandbox, rather than trying to read files from
 a separate Modal function.
 """
 import os
+import re
 import pytest
 from dotenv import load_dotenv
 
 load_dotenv()
 
 
+def clean_output(raw_text: str) -> str:
+    """Strip ANSI escape codes and normalize line endings for CI/CD compatibility."""
+    if not raw_text:
+        return ""
+    ansi_escape = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
+    text = ansi_escape.sub('', raw_text)
+    return text.replace('\r\n', '\n').replace('\r', '\n').strip()
+
+
+@pytest.mark.timeout(300)
 def test_export_dataset_from_inside_sandbox():
     """Test that we can export a dataset by running export code inside the sandbox."""
-    # Skip in CI
-    if os.getenv("CI") == "true":
-        pytest.skip("Flaky in CI due to buffering issues")
-
     # Require Modal tokens to run this real integration test
     if not (os.getenv("MODAL_TOKEN_ID") and os.getenv("MODAL_TOKEN_SECRET")):
         pytest.skip("Modal tokens not configured; skipping real Modal integration test")
@@ -54,9 +61,11 @@ print(f"File exists: {file_path.exists()}")
         
         result1 = executor.execute(create_code)
         print("Create result:", result1)
-        assert result1["stderr"] == "" or "FutureWarning" in result1["stderr"]
-        assert "Created dataset at:" in result1["stdout"]
-        assert "File exists: True" in result1["stdout"]
+        stderr = clean_output(result1["stderr"])
+        stdout = clean_output(result1["stdout"])
+        assert stderr == "" or "FutureWarning" in stderr
+        assert "Created dataset at:" in stdout
+        assert "File exists: True" in stdout
         
         # Step 2: Export the dataset from inside the sandbox
         # We'll test with and without S3 credentials
@@ -172,12 +181,10 @@ print(json.dumps(result))
         executor.terminate()
 
 
-def test_export_dataset_tool_integration():
+@pytest.mark.asyncio
+@pytest.mark.timeout(300)
+async def test_export_dataset_tool_integration():
     """Test the actual export_dataset_tool works with the sandbox."""
-    # Skip in CI
-    if os.getenv("CI") == "true":
-        pytest.skip("Flaky in CI due to buffering issues")
-
     # Require Modal tokens to run this real integration test
     if not (os.getenv("MODAL_TOKEN_ID") and os.getenv("MODAL_TOKEN_SECRET")):
         pytest.skip("Modal tokens not configured; skipping real Modal integration test")
@@ -208,15 +215,15 @@ df.to_parquet('datasets/tool_test.parquet')
 print("Dataset created")
 """
         result = executor.execute(create_code)
-        assert "Dataset created" in result["stdout"]
+        assert "Dataset created" in clean_output(result["stdout"])
         print(f"✓ Dataset created in session {session_id}")
         
         # Step 2: Use the export_dataset_tool
         mock_runtime = Mock()
         mock_runtime.tool_call_id = "test-call-123"
         
-        # Call the function directly
-        command = export_dataset_tool.func("datasets/tool_test.parquet", mock_runtime)
+        # Call the async tool via its coroutine
+        command = await export_dataset_tool.coroutine("datasets/tool_test.parquet", mock_runtime)
         
         # Extract the result
         tool_message = command.update["messages"][0]

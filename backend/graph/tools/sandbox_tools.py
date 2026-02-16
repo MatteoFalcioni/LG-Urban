@@ -5,6 +5,8 @@ from __future__ import annotations
 import os
 import json
 import base64
+import asyncio
+from concurrent.futures import ThreadPoolExecutor
 from typing import Dict
 from typing_extensions import Annotated
 
@@ -13,9 +15,6 @@ from langchain.tools import tool, ToolRuntime
 from langgraph.types import Command
 
 
-from backend.opendata_api.helpers import (
-    get_dataset_bytes,
-)  # change heavy detection this to be more reliable
 from backend.opendata_api.init_client import client
 from backend.modal_runtime.executor import SandboxExecutor
 from backend.modal_runtime.session import session_base_dir
@@ -26,13 +25,40 @@ from backend.graph.context import get_thread_id
 # Session-based executor cache: one sandbox per session
 _executor_cache: Dict[str, SandboxExecutor] = {}
 
+# Thread pool for blocking Modal operations
+_modal_thread_pool = ThreadPoolExecutor(max_workers=4)
+
 
 # ===== executor management =====
+def _create_executor_sync(session_id: str) -> SandboxExecutor:
+    """Synchronously create a SandboxExecutor (blocking - runs in thread pool)."""
+    return SandboxExecutor(session_id=session_id)
+
+
 def get_or_create_executor(session_id: str) -> SandboxExecutor:
-    """Get existing executor for session or create new one."""
+    """Get existing executor for session or create new one.
+    
+    WARNING: If executor doesn't exist, this BLOCKS while creating the sandbox.
+    Use async_get_or_create_executor() in async contexts to avoid blocking the event loop.
+    """
     if session_id not in _executor_cache:
         _executor_cache[session_id] = SandboxExecutor(session_id=session_id)
     return _executor_cache[session_id]
+
+
+async def async_get_or_create_executor(session_id: str) -> SandboxExecutor:
+    """Async version that creates executor in thread pool to avoid blocking event loop.
+    
+    Use this in async tools to prevent the Modal sandbox creation from blocking FastAPI.
+    """
+    if session_id in _executor_cache:
+        return _executor_cache[session_id]
+    
+    # Create executor in thread pool to avoid blocking
+    loop = asyncio.get_running_loop()
+    executor = await loop.run_in_executor(_modal_thread_pool, _create_executor_sync, session_id)
+    _executor_cache[session_id] = executor
+    return executor
 
 
 def terminate_session_executor(session_id: str) -> None:
@@ -49,7 +75,7 @@ def terminate_session_executor(session_id: str) -> None:
 # execute code tool
 # -----------------
 @tool(name_or_callable="execute_code", description="Use this to execute python code.")
-def execute_code_tool(
+async def execute_code_tool(
     code: Annotated[str, "The python code to execute."], runtime: ToolRuntime
 ) -> Command:
     """Use this to execute python code."""
@@ -67,8 +93,27 @@ def execute_code_tool(
         )
 
     session_id = str(thread_id)
-    executor = get_or_create_executor(session_id)
-    result = executor.execute(code)
+    # Use async version to avoid blocking event loop during sandbox creation
+    executor = await async_get_or_create_executor(session_id)
+    
+    # Run blocking executor.execute() in thread pool with timeout
+    loop = asyncio.get_running_loop()
+    try:
+        result = await asyncio.wait_for(
+            loop.run_in_executor(None, executor.execute, code),
+            timeout=120.0  # 2 minute timeout for code execution
+        )
+    except asyncio.TimeoutError:
+        return Command(
+            update={
+                "messages": [
+                    ToolMessage(
+                        content="Error: Code execution timed out after 120 seconds. The sandbox may be unresponsive or the code is taking too long.",
+                        tool_call_id=runtime.tool_call_id,
+                    )
+                ]
+            }
+        )
 
     # take out artifacts from result and use artifact field of ToolMessage to return them
     artifacts = result.pop("artifacts")
@@ -125,7 +170,10 @@ async def load_dataset_tool(
             }
         )
     session_id = str(thread_id)
-    executor = get_or_create_executor(session_id)
+    # Use async version to avoid blocking event loop during sandbox creation
+    executor = await async_get_or_create_executor(session_id)
+
+    print(f"Checking if dataset {dataset_id} is already loaded...")
 
     # First, check if the dataset was already loaded in the workspace
     check_code = f"""
@@ -142,8 +190,30 @@ else:
     result = {{"exists": False, "path": str(dataset_path)}}
 print(json.dumps(result))
 """
-    check_result = executor.execute(check_code)
+    print("DEBUG: Calling executor.execute()...")
+    # Run blocking executor.execute() in thread pool to avoid blocking event loop
+    loop = asyncio.get_running_loop()
+    try:
+        check_result = await asyncio.wait_for(
+            loop.run_in_executor(None, executor.execute, check_code),
+            timeout=60.0  # 60 second timeout for the check operation
+        )
+        print("DEBUG: Executor executed.")
+    except asyncio.TimeoutError:
+        print("ERROR: Executor timed out after 60 seconds")
+        return Command(
+            update={
+                "messages": [
+                    ToolMessage(
+                        content=f"Error: Timeout checking if dataset '{dataset_id}' exists. The sandbox may be unresponsive.",
+                        tool_call_id=runtime.tool_call_id,
+                    )
+                ]
+            }
+        )
     stdout = check_result.get("stdout", "").strip()
+
+    print(f"Check result: {stdout}")
 
     try:
         check_data = json.loads(stdout) if stdout else {}
@@ -172,18 +242,28 @@ print(json.dumps(result))
                     ]
                 }
             )
-    except (json.JSONDecodeError, KeyError):
+    except (json.JSONDecodeError, KeyError) as e:
         # If check fails, continue to load anyway
-        pass
+        print(f"Check failed for dataset {dataset_id}; error: {e}. Continuing to load...")
 
     # If not, load from S3 or API
     try:
         import boto3
+        import tempfile
+        import time
         from botocore.client import Config
+
+        print(f"[LOAD_DATASET] Starting load for {dataset_id}")
 
         region = os.getenv("AWS_REGION", "eu-central-1")
         s3 = boto3.client(
-            "s3", region_name=region, config=Config(signature_version="s3v4")
+            "s3",
+            region_name=region,
+            config=Config(
+                signature_version="s3v4",
+                connect_timeout=10,
+                read_timeout=30
+            )
         )
         input_bucket = os.getenv("S3_BUCKET")
         if not input_bucket:
@@ -201,56 +281,90 @@ print(json.dumps(result))
         # Try S3 first (input/datasets/{dataset_id}.parquet)
         data_bytes = None
         s3_key = f"input/datasets/{dataset_id}.parquet"
+        
+        # Create a temp file to store the dataset locally (avoids RAM spikes)
+        with tempfile.NamedTemporaryFile(delete=False) as tmp_file:
+            temp_path = tmp_file.name
+            print(f"Created temp file: {temp_path}")
 
         try:
-            s3.head_object(Bucket=input_bucket, Key=s3_key)
-            data_bytes = s3.get_object(Bucket=input_bucket, Key=s3_key)["Body"].read()
-        except Exception:
-            # Not in S3, try fetching from API
+            # Check S3
             try:
-                data_bytes = await get_dataset_bytes(
-                    client=client, dataset_id=dataset_id
-                )
+                print("Checking S3...")
+                s3.head_object(Bucket=input_bucket, Key=s3_key)
+                
+                # Download from S3 to file
+                print("Downloading from S3 to file...")
+                s3.download_file(input_bucket, s3_key, temp_path)
+                print("S3 download complete")
+                
+                with open(temp_path, "rb") as f:
+                    data_bytes = f.read()
+                print("Read bytes from file into RAM")
+                
+            except Exception:
+                # Not in S3, download from API to file
+                try:
+                    print("Not in S3. Downloading from API to file...")
+                    start_dl = time.time()
+                    await client.export_to_file(
+                        dataset_id=dataset_id, path=temp_path
+                    )
+                    dl_time = time.time() - start_dl
+                    print(f"API Download complete in {dl_time:.2f}s")
+                    
+                    # Read bytes for sandbox injection
+                    print("Reading file into RAM...")
+                    with open(temp_path, "rb") as f:
+                        data_bytes = f.read()
+                    print(f"Read {len(data_bytes) / 1024 / 1024:.2f} MB into RAM")
 
-                if not data_bytes:
-                    return Command(
+                    if not data_bytes:
+                         return Command(
+                            update={
+                                "messages": [
+                                    ToolMessage(
+                                        content=f"Error: Dataset '{dataset_id}' returned empty data.",
+                                        tool_call_id=runtime.tool_call_id,
+                                    )
+                                ]
+                            }
+                        )
+                except Exception as api_err:
+                     print(f"API Error: {str(api_err)}")
+                     return Command(
                         update={
                             "messages": [
                                 ToolMessage(
-                                    content=f"Error: Dataset '{dataset_id}' not found or returned empty data. Please check the dataset ID.",
+                                    content=f"Error: Failed to fetch dataset '{dataset_id}' from API. Error: {str(api_err)}",
                                     tool_call_id=runtime.tool_call_id,
                                 )
                             ]
                         }
                     )
 
-            except Exception as api_err:
-                return Command(
-                    update={
-                        "messages": [
-                            ToolMessage(
-                                content=f"Error: Failed to fetch dataset '{dataset_id}' from API. It may not exist or be unavailable. Error: {str(api_err)}",
-                                tool_call_id=runtime.tool_call_id,
-                            )
-                        ]
-                    }
-                )
-
-            # after downloading from API, upload to S3 right away
-            try:
-                s3.put_object(
-                    Bucket=input_bucket,
-                    Key=s3_key,
-                    Body=data_bytes,
-                    ContentType="application/parquet",
-                )
-            except Exception as upload_err:
-                # Log but don't fail - only upload to S3 failed, process can continue
-                print(
-                    f"Warning: Failed to upload dataset to S3: {upload_err}. Dataset is being loaded into workspace anyway..."
-                )
+                # After downloading from API, upload to S3 from file
+                try:
+                    print("Uploading to S3...")
+                    s3.upload_file(
+                        Filename=temp_path,
+                        Bucket=input_bucket,
+                        Key=s3_key,
+                        ExtraArgs={"ContentType": "application/parquet"},
+                    )
+                    print("S3 Upload complete")
+                except Exception as upload_err:
+                    print(
+                        f"Warning: Failed to upload dataset to S3: {upload_err}. Dataset is being loaded into workspace anyway..."
+                    )
+        finally:
+            # Clean up temp file
+            if os.path.exists(temp_path):
+                os.unlink(temp_path)
+            print("Cleanup complete")
 
         # Write dataset directly to sandbox using executor.execute()
+        print("Encoding base64...")
         data_b64 = base64.b64encode(data_bytes).decode("utf-8")
         # Use repr() to safely pass the base64 string in the f-string
         write_code = f"""
@@ -285,7 +399,26 @@ result = {{
 
 print(json.dumps(result))
 """
-        write_result = executor.execute(write_code)
+        print("Executing write code in sandbox...")
+        # Run blocking executor.execute() in thread pool with timeout
+        loop = asyncio.get_running_loop()
+        try:
+            write_result = await asyncio.wait_for(
+                loop.run_in_executor(None, executor.execute, write_code),
+                timeout=120.0  # 2 minute timeout for writing dataset
+            )
+            print("Write code executed")
+        except asyncio.TimeoutError:
+            return Command(
+                update={
+                    "messages": [
+                        ToolMessage(
+                            content=f"Error: Timeout writing dataset '{dataset_id}' to sandbox. The sandbox may be unresponsive.",
+                            tool_call_id=runtime.tool_call_id,
+                        )
+                    ]
+                }
+            )
 
         stdout = write_result.get("stdout", "").strip()
         stderr = write_result.get("stderr", "")
@@ -363,7 +496,7 @@ print(json.dumps(result))
     name_or_callable="list_loaded_datasets",
     description="List datasets already loaded in the current workspace.",
 )
-def list_loaded_datasets_tool(runtime: ToolRuntime) -> Command:
+async def list_loaded_datasets_tool(runtime: ToolRuntime) -> Command:
     """
     Lists datasets already loaded in the current workspace.
     NOTE: we do not list S3 datasets because we don't want the model to get confused.
@@ -385,7 +518,8 @@ def list_loaded_datasets_tool(runtime: ToolRuntime) -> Command:
 
     try:
         session_id = str(thread_id)
-        executor = get_or_create_executor(session_id)
+        # Use async version to avoid blocking event loop during sandbox creation
+        executor = await async_get_or_create_executor(session_id)
 
         # List datasets directly in the sandbox
         list_code = """
@@ -401,7 +535,24 @@ else:
 
 print(json.dumps(files))
 """
-        result = executor.execute(list_code)
+        # Run blocking executor.execute() in thread pool with timeout
+        loop = asyncio.get_running_loop()
+        try:
+            result = await asyncio.wait_for(
+                loop.run_in_executor(None, executor.execute, list_code),
+                timeout=30.0  # 30 second timeout for listing datasets
+            )
+        except asyncio.TimeoutError:
+            return Command(
+                update={
+                    "messages": [
+                        ToolMessage(
+                            content="Error: Timeout listing loaded datasets. The sandbox may be unresponsive.",
+                            tool_call_id=runtime.tool_call_id,
+                        )
+                    ]
+                }
+            )
 
         # Parse JSON from stdout
         stdout = result.get("stdout", "").strip()
@@ -465,7 +616,7 @@ print(json.dumps(files))
     name_or_callable="export_dataset",
     description="Use this to export a dataset from the sandbox given its path.",
 )
-def export_dataset_tool(
+async def export_dataset_tool(
     dataset_path: Annotated[str, "The path of the dataset to export."],
     runtime: ToolRuntime,
 ) -> Command:
@@ -522,10 +673,18 @@ else:
     mime = mimetypes.guess_type(file_path.name)[0] or "application/octet-stream"
     size = len(data)
     
-    # Upload to S3
+    # Upload to S3 with timeout
     s3_key = f"output/datasets/{{sha256[:2]}}/{{sha256[2:4]}}/{{sha256}}"
     region = "eu-central-1"
-    s3_client = boto3.client("s3", region_name=region, config=Config(signature_version='s3v4'))
+    s3_client = boto3.client(
+        "s3",
+        region_name=region,
+        config=Config(
+            signature_version='s3v4',
+            connect_timeout=10,
+            read_timeout=30
+        )
+    )
     s3_client.put_object(
         Bucket="{bucket}",
         Key=s3_key,
@@ -547,8 +706,27 @@ print(json.dumps(result))
 """
 
     # Execute the export code in the sandbox
-    executor = get_or_create_executor(session_id)
-    result = executor.execute(export_code)
+    # Use async version to avoid blocking event loop during sandbox creation
+    executor = await async_get_or_create_executor(session_id)
+    
+    # Run blocking executor.execute() in thread pool with timeout
+    loop = asyncio.get_running_loop()
+    try:
+        result = await asyncio.wait_for(
+            loop.run_in_executor(None, executor.execute, export_code),
+            timeout=120.0  # 2 minute timeout for exporting dataset
+        )
+    except asyncio.TimeoutError:
+        return Command(
+            update={
+                "messages": [
+                    ToolMessage(
+                        content=f"Error: Timeout exporting dataset from '{dataset_path}'. The sandbox may be unresponsive or S3 upload is slow.",
+                        tool_call_id=runtime.tool_call_id,
+                    )
+                ]
+            }
+        )
 
     # The result will be in stdout as JSON
     stdout = result.get("stdout", "").strip()

@@ -1,8 +1,6 @@
 from langgraph.types import Command
 from typing_extensions import Literal
 from langchain.agents import create_agent
-from langchain_openai import ChatOpenAI
-from langchain_anthropic import ChatAnthropic
 from langgraph.graph import StateGraph, START
 from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 from langchain_text_splitters import TokenTextSplitter
@@ -13,6 +11,8 @@ from dotenv import load_dotenv
 import os
 from datetime import datetime
 from pathlib import Path
+
+from backend.graph.utils import get_openrouter_model
 
 from backend.graph.prompts.summarizer import summarizer_prompt
 from backend.graph.prompts.analyst import PROMPT
@@ -95,74 +95,66 @@ def make_graph(
     Create a graph with custom config. Reuses the same checkpointer for all invocations.
 
     Args:
-        model_name: OpenAI model name (e.g., "gpt-4.1"") or Anthropic model name (e.g., "claude-sonnet-4-5")
+        model_name: Model name (e.g., "gpt-4.1", "claude-sonnet-4-5"). 
+                    Automatically converted to OpenRouter format (openai/gpt-4.1, anthropic/claude-sonnet-4-5).
         temperature: Model temperature (0.0-2.0). If None, uses env DEFAULT_TEMPERATURE or model default.
         system_prompt: Custom system prompt. If None, uses default PROMPT.
         context_window: Custom context window. If None, uses env CONTEXT_WINDOW.
         checkpointer: Reused checkpointer instance from app startup.
-        user_api_keys: Dict with 'openai_key' and 'anthropic_key' for user-provided API keys.
+        user_api_keys: Dict with 'openrouter_key' for user-provided OpenRouter API key.
     """
 
     # ======= API KEYS SETUP =======
     # Extract API keys once at the beginning
-    openai_api_key = None
-    if user_api_keys and user_api_keys.get("openai_key"):
-        openai_api_key = SecretStr(user_api_keys["openai_key"])
-    elif os.getenv("OPENAI_API_KEY"):
-        openai_api_key = SecretStr(os.getenv("OPENAI_API_KEY"))
-
-    anthropic_api_key = None
-    if user_api_keys and user_api_keys.get("anthropic_key"):
-        anthropic_api_key = SecretStr(user_api_keys["anthropic_key"])
-    elif os.getenv("ANTHROPIC_API_KEY"):
-        anthropic_api_key = SecretStr(os.getenv("ANTHROPIC_API_KEY"))
+    # Priority: user_api_keys > environment variables
+    openrouter_api_key = None
+    if user_api_keys and user_api_keys.get("openrouter_key"):
+        openrouter_api_key = SecretStr(user_api_keys["openrouter_key"])
+    elif os.getenv("OPENROUTER_API_KEY"):
+        openrouter_api_key = SecretStr(os.getenv("OPENROUTER_API_KEY"))
 
     # ======= SUPERVISOR =======
-    # use gpt-4.1 for supervisor
-    supervisor_llm_kwargs = {"model": "gpt-4.1"}
-    if openai_api_key:
-        supervisor_llm_kwargs["api_key"] = openai_api_key
-
-    supervisor_llm = ChatOpenAI(**supervisor_llm_kwargs)
+    # use gpt-4.1 for supervisor (via OpenRouter)
+    supervisor_llm = get_openrouter_model(
+        model_name="openai/gpt-4.1",  
+        api_key=openrouter_api_key
+    ) 
 
     supervisor_agent = create_agent(
         model=supervisor_llm,
         tools=[assign_to_analyst, assign_to_report_writer, assign_to_reviewer],
         system_prompt=supervisor_prompt,
         name="agent_supervisor",
-        state_schema=MyState,
+        state_schema=MyState, 
     )
 
     # ======= ANALYST AGENT =======
     from backend.config import DEFAULT_MODEL, DEFAULT_TEMPERATURE, CONTEXT_WINDOW
-
-    # Use config or fall back to env defaults
-    model_name = model_name or DEFAULT_MODEL
-    temp = temperature if temperature is not None else DEFAULT_TEMPERATURE
+    model_name = model_name or DEFAULT_MODEL 
+    temp = temperature if temperature is not None else DEFAULT_TEMPERATURE 
     context_window = context_window if context_window is not None else CONTEXT_WINDOW
     effective_context_window = int(context_window * 0.9)  # (90% for safety)
     print(
         f"[MODEL] Using model: {model_name} (temperature: {temp if temp is not None else DEFAULT_TEMPERATURE}), context window: {context_window if context_window is not None else CONTEXT_WINDOW}"
     )
-    llm_kwargs = {"model": model_name}
-    if temp is not None:
-        llm_kwargs["temperature"] = temp
-
-    # Use extracted API keys
+    
+    # Convert model name to OpenRouter format if needed
+    # OpenRouter expects format: "provider/model-name"
     if model_name.startswith("gpt-"):
-        if openai_api_key:
-            llm_kwargs["api_key"] = openai_api_key
-
-        llm = ChatOpenAI(
-            **llm_kwargs,
-            stream_usage=True,  # to get usr metadata with astream_events (crucial for token count, but that feature is deprecated)
-        )
+        openrouter_model_name = f"openai/{model_name}"
     elif model_name.startswith("claude-"):
-        # https://docs.claude.com/en/docs/about-claude/models/overview#model-names
-        if anthropic_api_key:
-            llm_kwargs["api_key"] = anthropic_api_key
-
-        llm = ChatAnthropic(**llm_kwargs, stream_usage=True)
+        openrouter_model_name = f"anthropic/{model_name}"
+    else:
+        # Assume it's already in OpenRouter format or a valid model name
+        openrouter_model_name = model_name
+    
+    # Create analyst LLM via OpenRouter
+    llm = get_openrouter_model(
+        model_name=openrouter_model_name,
+        temperature=temp,
+        api_key=openrouter_api_key,
+        stream_usage=True  # to get usr metadata with astream_events (crucial for token count)
+    )
 
     # Use default prompt, + custom prompt as string (LangChain v1.0 expects string, not SystemMessage)
     prompt_text = PROMPT
@@ -195,11 +187,11 @@ def make_graph(
         *report_tools,
     ]
 
-    summarizer_kwargs = {"model": "gpt-4.1"}
-    if openai_api_key:
-        summarizer_kwargs["api_key"] = openai_api_key
-
-    summarizer = ChatOpenAI(**summarizer_kwargs)  # summarizer for middleware
+    # Summarizer for middleware (via OpenRouter)
+    summarizer = get_openrouter_model(
+        model_name="openai/gpt-4.1",
+        api_key=openrouter_api_key
+    )
 
     analyst_agent = create_agent(
         model=llm,
@@ -222,12 +214,11 @@ def make_graph(
     )
 
     # ======= REPORT WRITER AGENT =======
-    # use gpt 4.1 for report writer instead of haiku
-    report_writer_kwargs = {"model": "gpt-4.1"}
-    if openai_api_key:
-        report_writer_kwargs["api_key"] = openai_api_key
-
-    report_writer_llm = ChatOpenAI(**report_writer_kwargs)
+    # use gpt 4.1 for report writer (via OpenRouter)
+    report_writer_llm = get_openrouter_model(
+        model_name="openai/gpt-4.1",
+        api_key=openrouter_api_key
+    )
 
     agent_report_writer = create_agent(
         model=report_writer_llm,
@@ -246,12 +237,11 @@ def make_graph(
     )
 
     # ======= REVIEWER AGENT =======
-    # use gpt-4.1 for reviewer
-    reviewer_kwargs = {"model": "gpt-4.1"}
-    if openai_api_key:
-        reviewer_kwargs["api_key"] = openai_api_key
-
-    reviewer_llm = ChatOpenAI(**reviewer_kwargs)
+    # use gpt-4.1 for reviewer (via OpenRouter)
+    reviewer_llm = get_openrouter_model(
+        model_name="openai/gpt-4.1",
+        api_key=openrouter_api_key
+    )
     agent_reviewer = create_agent(
         model=reviewer_llm,
         tools=[
@@ -284,20 +274,14 @@ def make_graph(
     ) -> Command[Literal["supervisor"]]:
         """
         Main node of the graph.
-        Workflow:
-            - (1) checks if there are comments made from the reviewer and adds them to messages
-            - (2) invokes the analyst agent
-            - (3) if code_logs (produced by analysit) exceed 5000 tokens they get chunked into smaller parts
-            - (4) routes back to supervisor once it finishes the analysis
         """
+        print("[GRAPH] Entering analyst_agent_node")
 
         messages = state["messages"]
 
-        # (1) if there are any comments made from the reviewer, use them in the analysis invocation (if there are, it means analysis was rejected)
+        # (1) if there are any comments made from the reviewer, use them in the analysis invocation
         analysis_comments = state.get("analysis_comments", "")
-        if (
-            analysis_comments
-        ):  # this condition does not activate if analysis_comments = ""
+        if analysis_comments:
             messages += [
                 HumanMessage(
                     content=f"The reviewer reviewed your analysis and rejected it; improve your previous analysis following the following comments that the reviewer made: {analysis_comments}"
@@ -305,15 +289,22 @@ def make_graph(
             ]
 
         # (2) invoke the agent
-        result = await analyst_agent.ainvoke({**state, "messages": messages})
+        print("[GRAPH] Invoking analyst_agent...")
+        try:
+            result = await analyst_agent.ainvoke({**state, "messages": messages})
+            print("[GRAPH] analyst_agent returned successfully")
+        except Exception as e:
+            print(f"[GRAPH] analyst_agent FAILED: {e}")
+            raise
+
         last_msg = result["messages"][-1]
-        code_logs = result.get("code_logs", "")
+        code_logs = result.get("code_logs", [])
 
         # (3) check if code logs exceed token threshold: if so, chunk them
         # NOTE: estimates are more accurate for openai models since they leverage tiktoken.
         code_logs_str = "\n".join(
             [
-                f"```python\n{code_log['input']}\n```\nstdout: ```bash\n{code_log['stdout']}\n```\nstderr: ```bash\n{code_log['stderr']}\n```"
+                f"\n```python\n{code_log['input']}\n```\nstdout: \n```bash\n{code_log['stdout']}\n```\nstderr: \n```bash\n{code_log['stderr']}\n```"
                 for code_log in code_logs
             ]
         )
@@ -341,10 +332,13 @@ def make_graph(
         todos = result.get("todos", [])
         sources = result.get("sources", [])
 
+        print(f"***DEBUG***: code_logs len at return: {len(code_logs)}")
+
         return Command(
             update={
                 "messages": msg_update,
-                "code_logs": [],  # clean code logs: we transferred their info into code_logs_chunks
+                # NOTE: not resetting code logs to [] here, 'cause the supervisor does it at assignment to data analyst 
+                "code_logs" : code_logs,
                 "code_logs_chunks": code_logs_chunks,
                 "sources": sources,  # updated by analyst
                 "analysis_comments": "",  # reset analysis comments (if there were any, we used them)
@@ -399,7 +393,6 @@ def make_graph(
         completeness_score = result["completeness_score"]
         relevancy_score = result["relevancy_score"]
         final_score = (completeness_score + relevancy_score) / 2
-
         # NOTE: right now we are not handling the case where the review should not be approved because of a low score:
         # instead we always approve and just show the score in frontend.
 
@@ -458,7 +451,7 @@ def make_graph(
     # ======= GRAPH  BUILDING =======
 
     builder = StateGraph(MyState)
-
+        
     builder.add_node(
         "supervisor", supervisor_agent
     )  # , destinations=("data_analyst", "report_writer", "reviewer", END)

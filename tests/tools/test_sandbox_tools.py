@@ -22,6 +22,8 @@ import io
 from unittest.mock import Mock
 from dotenv import load_dotenv
 
+from conftest import clean_output
+
 from backend.graph.context import set_thread_id, get_thread_id
 from backend.graph.tools.sandbox_tools import (
     execute_code_tool,
@@ -38,8 +40,7 @@ load_dotenv()
 @pytest.fixture(scope="module")
 def test_session_id():
     """Create a single test session ID shared across all tests in this module."""
-    # Use a fixed UUID for all tests so they share the same Modal workspace
-    test_uuid = uuid.UUID("00000000-0000-0000-0000-000000000001")
+    test_uuid = str(uuid.uuid4())  # use a random UUID for each test
     set_thread_id(test_uuid)
     session_id = str(test_uuid)
     yield session_id
@@ -90,18 +91,20 @@ def _have_full_config() -> bool:
     return _have_modal_tokens() and _have_s3_config()
 
 
+@pytest.mark.asyncio
 class TestExecuteCodeTool:
     """Tests for execute_code_tool - actually executes code in Modal sandbox."""
     
-    @pytest.mark.skipif(not _have_modal_tokens() or os.getenv("CI") == "true", reason="Modal tokens not configured or CI env flaky")
-    def test_execute_simple_code(self, test_session_id, mock_runtime):
+    @pytest.mark.skipif(not _have_modal_tokens(), reason="Modal tokens not configured")
+    @pytest.mark.timeout(180)
+    async def test_execute_simple_code(self, test_session_id, mock_runtime):
         """Test executing simple Python code in real Modal sandbox."""
         print(f"\n🚀 Testing simple code execution in session {test_session_id[:8]}...")
         
         code = "result = 2 + 2\nprint(f'Result: {result}')"
         
-        # Call the underlying function using .func
-        command = execute_code_tool.func(code, mock_runtime)
+        # Call the tool via its async coroutine interface
+        command = await execute_code_tool.coroutine(code, mock_runtime)
         
         # Check that a Command was returned
         assert command is not None
@@ -116,33 +119,36 @@ class TestExecuteCodeTool:
         print(f"📊 Result: {result}")
         
         assert "stdout" in result
-        assert "Result: 4" in result["stdout"] or "4" in result["stdout"]
+        stdout = clean_output(result["stdout"])
+        assert "Result: 4" in stdout or "4" in stdout
         # Should not have errors
-        assert not result.get("stderr") or result["stderr"] == ""
+        assert not result.get("stderr") or clean_output(result["stderr"]) == ""
     
-    @pytest.mark.skipif(not _have_modal_tokens() or os.getenv("CI") == "true", reason="Modal tokens not configured or CI flaky")
-    def test_execute_code_persists_state(self, test_session_id, mock_runtime):
+    @pytest.mark.skipif(not _have_modal_tokens(), reason="Modal tokens not configured")
+    @pytest.mark.timeout(180)
+    async def test_execute_code_persists_state(self, test_session_id, mock_runtime):
         """Test that Python state actually persists across executions in same session."""
         print(f"\n🔄 Testing state persistence in session {test_session_id[:8]}...")
         
         # First execution: define a variable
         code1 = "x = 42\nprint('Set x to 42')"
-        command1 = execute_code_tool.func(code1, mock_runtime)
+        command1 = await execute_code_tool.coroutine(code1, mock_runtime)
         result1 = json.loads(command1.update["messages"][0].content)
         
         print(f"📊 First execution: {result1}")
-        assert "Set x to 42" in result1["stdout"]
+        assert "Set x to 42" in clean_output(result1["stdout"])
         
         # Second execution: use the variable (proves state persisted)
         code2 = "print(f'x + 1 = {x + 1}')"
-        command2 = execute_code_tool.func(code2, mock_runtime)
+        command2 = await execute_code_tool.coroutine(code2, mock_runtime)
         result2 = json.loads(command2.update["messages"][0].content)
         
         print(f"📊 Second execution: {result2}")
-        assert "x + 1 = 43" in result2["stdout"]
+        assert "x + 1 = 43" in clean_output(result2["stdout"])
     
-    @pytest.mark.skipif(not _have_modal_tokens() or os.getenv("CI") == "true", reason="Modal tokens not configured or CI flaky")
-    def test_execute_code_with_pandas(self, test_session_id, mock_runtime):
+    @pytest.mark.skipif(not _have_modal_tokens(), reason="Modal tokens not configured")
+    @pytest.mark.timeout(180)
+    async def test_execute_code_with_pandas(self, test_session_id, mock_runtime):
         """Test executing code with pandas (verify packages available)."""
         print(f"\n🐼 Testing pandas in session {test_session_id[:8]}...")
         
@@ -153,37 +159,40 @@ print(f'DataFrame shape: {df.shape}')
 print(df.to_string())
 """
         
-        command = execute_code_tool.func(code, mock_runtime)
+        command = await execute_code_tool.coroutine(code, mock_runtime)
         result = json.loads(command.update["messages"][0].content)
         
         print(f"📊 Result: {result}")
-        assert "DataFrame shape: (3, 2)" in result["stdout"]
+        assert "DataFrame shape: (3, 2)" in clean_output(result["stdout"])
     
-    @pytest.mark.skipif(not _have_modal_tokens() or os.getenv("CI") == "true", reason="Modal tokens not configured or CI flaky")
-    def test_execute_code_with_error(self, test_session_id, mock_runtime):
+    @pytest.mark.skipif(not _have_modal_tokens(), reason="Modal tokens not configured")
+    @pytest.mark.timeout(180)
+    async def test_execute_code_with_error(self, test_session_id, mock_runtime):
         """Test executing code that raises an error."""
         print(f"\n❌ Testing error handling in session {test_session_id[:8]}...")
         
         code = "x = 1 / 0  # Division by zero"
         
-        command = execute_code_tool.func(code, mock_runtime)
+        command = await execute_code_tool.coroutine(code, mock_runtime)
         result = json.loads(command.update["messages"][0].content)
         
         print(f"📊 Error result: {result}")
         # Should have stderr with error message
         assert "stderr" in result
-        assert "division by zero" in result["stderr"].lower()
+        assert "division by zero" in clean_output(result["stderr"]).lower()
 
+@pytest.mark.asyncio
 class TestExecutorCacheManagement:
     """Tests for executor cache lifecycle."""
     
-    @pytest.mark.skipif(not _have_modal_tokens() or os.getenv("CI") == "true", reason="Modal tokens not configured or CI flaky")
-    def test_executor_reused_within_session(self, test_session_id, mock_runtime):
+    @pytest.mark.skipif(not _have_modal_tokens(), reason="Modal tokens not configured")
+    @pytest.mark.timeout(180)
+    async def test_executor_reused_within_session(self, test_session_id, mock_runtime):
         """Test that the same executor is reused for multiple calls in a session."""
         print(f"\n♻️  Testing executor reuse in session {test_session_id[:8]}...")
         
-        # First execution
-        execute_code_tool.func("x = 1", mock_runtime)
+        # First execution to create executor
+        await execute_code_tool.coroutine("x = 1", mock_runtime)
         
         # Check cache has our session
         assert test_session_id in _executor_cache
@@ -191,15 +200,16 @@ class TestExecutorCacheManagement:
         print(f"📦 Executor created: {id(executor1)}")
         
         # Second execution
-        execute_code_tool.func("y = 2", mock_runtime)
+        await execute_code_tool.coroutine("y = 2", mock_runtime)
         
         # Should be same executor instance
         executor2 = _executor_cache[test_session_id]
         print(f"📦 Executor reused: {id(executor2)}")
         assert executor1 is executor2, "Executor should be reused for same session"
     
-    @pytest.mark.skipif(not _have_modal_tokens() or os.getenv("CI") == "true", reason="Modal tokens not configured or CI flaky")
-    def test_terminate_session_executor(self, test_session_id, mock_runtime):
+    @pytest.mark.skipif(not _have_modal_tokens(), reason="Modal tokens not configured")
+    @pytest.mark.timeout(180)
+    async def test_terminate_session_executor(self, test_session_id, mock_runtime):
         """Test that terminate_session_executor properly cleans up."""
         # Save original thread_id
         original_thread_id = get_thread_id()
@@ -212,7 +222,7 @@ class TestExecutorCacheManagement:
         
         try:
             # Execute code to create executor
-            execute_code_tool.func("x = 1", mock_runtime)
+            await execute_code_tool.coroutine("x = 1", mock_runtime)
             
             # Verify executor exists
             assert session_id in _executor_cache
@@ -237,7 +247,8 @@ class TestExecutorCacheManagement:
 class TestIntegrationFlow:
     """End-to-end integration tests using real Modal and S3."""
     
-    @pytest.mark.skipif(not _have_full_config() or os.getenv("CI") == "true", reason="Modal and S3 not fully configured or CI flaky")
+    @pytest.mark.skipif(not _have_full_config(), reason="Modal and S3 not fully configured")
+    @pytest.mark.timeout(300)
     async def test_full_workflow_load_and_analyze(self, test_session_id, mock_runtime, test_dataset_bytes):
         """Test a full workflow: load dataset (mock API), analyze with code, export to S3."""
         print(f"\n🔄 Testing full workflow in session {test_session_id[:8]}...")
@@ -248,10 +259,14 @@ class TestIntegrationFlow:
         dataset_id = f"integration-test-{test_session_id[:8]}"
         print(f"📥 Step 1: Loading dataset {dataset_id}...")
         
-        # Mock get_dataset_bytes to return test data
-        with patch("backend.graph.tools.sandbox_tools.get_dataset_bytes", new_callable=AsyncMock) as mock_get:
-            mock_get.return_value = test_dataset_bytes
-            
+        # Mock client.export_to_file to write test data to the temp file
+        import tempfile
+        async def mock_export_to_file(dataset_id, path, fmt="parquet"):
+            """Mock that writes test_dataset_bytes to the file path."""
+            with open(path, "wb") as f:
+                f.write(test_dataset_bytes)
+        
+        with patch("backend.graph.tools.sandbox_tools.client.export_to_file", side_effect=mock_export_to_file):
             load_cmd = await load_dataset_tool.coroutine(dataset_id, mock_runtime)
             load_result = json.loads(load_cmd.update["messages"][0].content)
         
@@ -265,7 +280,7 @@ class TestIntegrationFlow:
         
         # 2. List datasets
         print(f"📋 Step 2: Listing datasets...")
-        list_cmd = list_loaded_datasets_tool.func(mock_runtime)
+        list_cmd = await list_loaded_datasets_tool.coroutine(mock_runtime)
         list_result = json.loads(list_cmd.update["messages"][0].content)
         
         print(f"✅ Found {len(list_result)} datasets: {list_result}")
@@ -293,22 +308,23 @@ print(f'Largest city: {{max_city}}')
 print(f'Cities: {{", ".join(df["city"].tolist())}}')
 """
         
-        exec_cmd = execute_code_tool.func(code, mock_runtime)
+        exec_cmd = await execute_code_tool.coroutine(code, mock_runtime)
         exec_result = json.loads(exec_cmd.update["messages"][0].content)
         
         print(f"✅ Analysis result:\n{exec_result['stdout']}")
         if exec_result.get('stderr'):
             print(f"⚠️  Stderr:\n{exec_result['stderr']}")
         
-        # Verify calculations
-        assert exec_result['stdout'], f"Expected stdout but got empty. stderr: {exec_result.get('stderr')}"
-        assert "Total population: 6,059,000" in exec_result["stdout"]
-        assert "Largest city: Roma" in exec_result["stdout"]
-        assert "Milano" in exec_result["stdout"]
+        # Verify calculations (use clean_output to handle CI/CD ANSI differences)
+        stdout = clean_output(exec_result['stdout'])
+        assert stdout, f"Expected stdout but got empty. stderr: {exec_result.get('stderr')}"
+        assert "Total population: 6,059,000" in stdout
+        assert "Largest city: Roma" in stdout
+        assert "Milano" in stdout
         
         # 4. Export dataset to S3 and verify
         print(f"📤 Step 4: Exporting dataset to S3...")
-        export_cmd = export_dataset_tool.func(dataset_path, mock_runtime)
+        export_cmd = await export_dataset_tool.coroutine(dataset_path, mock_runtime)
         export_result = json.loads(export_cmd.update["messages"][0].content)
         
         print(f"✅ Exported: {export_result.get('s3_url')}")

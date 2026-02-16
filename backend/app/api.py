@@ -7,6 +7,7 @@ from uuid import UUID
 import logging
 import uuid
 import json
+import time
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
@@ -41,6 +42,8 @@ async def get_user_api_keys_for_llm(user_id: str, session: AsyncSession) -> dict
             keys["openai_key"] = decrypt_api_key(user_keys.openai_key)
         if user_keys.anthropic_key:
             keys["anthropic_key"] = decrypt_api_key(user_keys.anthropic_key)
+        if user_keys.openrouter_key:
+            keys["openrouter_key"] = decrypt_api_key(user_keys.openrouter_key)
 
         return keys if keys else None
     except Exception:
@@ -577,8 +580,14 @@ async def get_thread_state(
             if state_snapshot.values
             else ""
         )
+        code_logs = (
+            state_snapshot.values.get("code_logs", []) if state_snapshot.values else []
+        )
         final_score = (
             state_snapshot.values.get("final_score") if state_snapshot.values else None
+        )
+        analysis_status = (
+            state_snapshot.values.get("analysis_status") if state_snapshot.values else None
         )
         context_window = (
             cfg.context_window
@@ -597,7 +606,10 @@ async def get_thread_state(
             "todos": todos,
             "report_title": last_report_title,
             "report_content": current_report_content,
+            "reports": reports,
+            "code_logs": code_logs,
             "final_score": final_score,
+            "analysis_status": analysis_status,
         }
     except Exception as e:
         # If state doesn't exist yet (new thread), return defaults
@@ -615,7 +627,10 @@ async def get_thread_state(
             "todos": [],
             "report_title": "",
             "report_content": "",
+            "reports": {},
+            "code_logs": [],
             "final_score": None,
+            "analysis_status": None,
         }
 
 
@@ -1517,8 +1532,8 @@ async def post_message_stream(
 # Resume endpoint for handling interrupts (human-in-the-loop)
 class ResumeRequest(BaseModel):
     resume_value: (
-        str | dict
-    )  # String for supervisor HITL ('accept'/'reject'), dict for other interrupts
+        dict
+    )  # dictionary of values 
 
 
 @router.post("/threads/{thread_id}/continue")
@@ -2095,9 +2110,7 @@ async def resume_thread(
 
     Uses the same graph instance (via singleton checkpointer) and config to resume execution.
 
-    Resume value format depends on the interrupt:
-    - For supervisor HITL (assign to report writer): "accept" or "reject" (string)
-    - For other interrupts (if any): {"type": "accept"} or other dict formats
+    Resume value format is a dict for all interrupts. Currently (23/12/2025) interrupt is only used in assigning to report writer.
     """
     from backend.graph.graph import make_graph
     from backend.main import get_thread_lock, _checkpointer_cm
@@ -2175,6 +2188,9 @@ async def resume_thread(
 
                 # Generate a unique message_id for this resume operation
                 resume_message_id = str(uuid_module.uuid4())
+
+                # Log resume value for debugging
+                logging.info(f"[RESUME] Thread {thread_id} - Resume value type: {type(payload.resume_value)}, value: {payload.resume_value}")
 
                 # Resume with Command(resume=resume_value) using SAME graph and config
                 async for event in graph.astream_events(
@@ -2711,36 +2727,60 @@ async def resume_thread(
 class APIKeysRequest(BaseModel):
     openai_key: Optional[str] = None
     anthropic_key: Optional[str] = None
+    openrouter_key: Optional[str] = None
 
 
 class APIKeysResponse(BaseModel):
     openai_key: Optional[str] = None  # Masked version
     anthropic_key: Optional[str] = None  # Masked version
+    openrouter_key: Optional[str] = None  # Masked version
 
 
 @router.get("/users/{user_id}/api-keys", response_model=APIKeysResponse)
 async def get_user_api_keys(user_id: str, session: AsyncSession = Depends(get_session)):
     """Get user's API keys (masked for security)."""
-    result = await session.execute(
-        select(UserAPIKeys).where(UserAPIKeys.user_id == user_id)
-    )
-    user_keys = result.scalar_one_or_none()
+    start_time = time.time()
+    logging.info(f"[API-KEYS] Starting fetch for user {user_id}")
+    
+    try:
+        result = await session.execute(
+            select(UserAPIKeys).where(UserAPIKeys.user_id == user_id)
+        )
+        query_time = time.time() - start_time
+        logging.info(f"[API-KEYS] Query completed in {query_time:.3f}s for user {user_id}")
+        
+        user_keys = result.scalar_one_or_none()
 
-    if not user_keys:
-        return APIKeysResponse()
+        if not user_keys:
+            total_time = time.time() - start_time
+            logging.info(f"[API-KEYS] No keys found. Total time: {total_time:.3f}s for user {user_id}")
+            return APIKeysResponse()
 
-    return APIKeysResponse(
-        openai_key=(
-            mask_api_key(decrypt_api_key(user_keys.openai_key))
-            if user_keys.openai_key
-            else None
-        ),
-        anthropic_key=(
-            mask_api_key(decrypt_api_key(user_keys.anthropic_key))
-            if user_keys.anthropic_key
-            else None
-        ),
-    )
+        response = APIKeysResponse(
+            openai_key=(
+                mask_api_key(decrypt_api_key(user_keys.openai_key))
+                if user_keys.openai_key
+                else None
+            ),
+            anthropic_key=(
+                mask_api_key(decrypt_api_key(user_keys.anthropic_key))
+                if user_keys.anthropic_key
+                else None
+            ),
+            openrouter_key=(
+                mask_api_key(decrypt_api_key(user_keys.openrouter_key))
+                if user_keys.openrouter_key
+                else None
+            ),
+        )
+        
+        total_time = time.time() - start_time
+        logging.info(f"[API-KEYS] Success. Total time: {total_time:.3f}s for user {user_id}")
+        return response
+    except Exception as e:
+        error_time = time.time() - start_time
+        logging.error(f"[API-KEYS] Error after {error_time:.3f}s for user {user_id}: {str(e)}")
+        raise
 
 
 @router.post("/users/{user_id}/api-keys", response_model=APIKeysResponse)
@@ -2770,6 +2810,11 @@ async def save_user_api_keys(
         user_keys.anthropic_key = (
             encrypt_api_key(keys.anthropic_key) if keys.anthropic_key else None
         )
+    
+    if "openrouter_key" in keys.model_fields_set:
+        user_keys.openrouter_key = (
+            encrypt_api_key(keys.openrouter_key) if keys.openrouter_key else None
+        )
 
     await session.commit()
     await session.refresh(user_keys)
@@ -2786,6 +2831,11 @@ async def save_user_api_keys(
             if user_keys.anthropic_key
             else None
         ),
+        openrouter_key=(
+            mask_api_key(decrypt_api_key(user_keys.openrouter_key))
+            if user_keys.openrouter_key
+            else None
+        ),
     )
 
 
@@ -2794,21 +2844,43 @@ async def get_user_api_keys_raw(
     user_id: str, session: AsyncSession = Depends(get_session)
 ):
     """Get user's API keys in raw format (for internal use by LLM services)."""
-    result = await session.execute(
-        select(UserAPIKeys).where(UserAPIKeys.user_id == user_id)
-    )
-    user_keys = result.scalar_one_or_none()
+    start_time = time.time()
+    logging.info(f"[API-KEYS-RAW] Starting fetch for user {user_id}")
+    
+    try:
+        result = await session.execute(
+            select(UserAPIKeys).where(UserAPIKeys.user_id == user_id)
+        )
+        query_time = time.time() - start_time
+        logging.info(f"[API-KEYS-RAW] Query completed in {query_time:.3f}s for user {user_id}")
+        
+        user_keys = result.scalar_one_or_none()
 
-    if not user_keys:
-        return {"openai_key": None, "anthropic_key": None}
+        if not user_keys:
+            total_time = time.time() - start_time
+            logging.info(f"[API-KEYS-RAW] No keys found. Total time: {total_time:.3f}s for user {user_id}")
+            return {"openai_key": None, "anthropic_key": None, "openrouter_key": None}
 
-    return {
-        "openai_key": (
-            decrypt_api_key(user_keys.openai_key) if user_keys.openai_key else None
-        ),
-        "anthropic_key": (
-            decrypt_api_key(user_keys.anthropic_key)
-            if user_keys.anthropic_key
-            else None
-        ),
-    }
+        response = {
+            "openai_key": (
+                decrypt_api_key(user_keys.openai_key) if user_keys.openai_key else None
+            ),
+            "anthropic_key": (
+                decrypt_api_key(user_keys.anthropic_key)
+                if user_keys.anthropic_key
+                else None
+            ),
+            "openrouter_key": (
+                decrypt_api_key(user_keys.openrouter_key)
+                if user_keys.openrouter_key
+                else None
+            ),
+        }
+        
+        total_time = time.time() - start_time
+        logging.info(f"[API-KEYS-RAW] Success. Total time: {total_time:.3f}s for user {user_id}")
+        return response
+    except Exception as e:
+        error_time = time.time() - start_time
+        logging.error(f"[API-KEYS-RAW] Error after {error_time:.3f}s for user {user_id}: {str(e)}")
+        raise

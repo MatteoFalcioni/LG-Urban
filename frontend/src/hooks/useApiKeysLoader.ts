@@ -17,16 +17,15 @@ export function useApiKeysLoader() {
       
       try {
         const keys = await getUserApiKeys(userId);
-        // Update store with masked keys (they're already masked from the API)
-        // The store tracks existence, not the actual key values
+        // Update store with masked key (already masked from the API)
+        // The store tracks existence, not the actual key value
         setApiKeys({
-          openai: keys.openai_key || null,
-          anthropic: keys.anthropic_key || null,
+          openrouter: keys.openrouter_key || null,
         });
       } catch (err) {
-        console.error('Failed to load API keys:', err);
+        console.error('Failed to load API key:', err);
         // On error, set to null so the warning modal can show
-        setApiKeys({ openai: null, anthropic: null });
+        setApiKeys({ openrouter: null });
       }
     }
 

@@ -5,10 +5,11 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
-  workflow_dispatch:  # ← Add this line
+  workflow_dispatch: 
 
 env:
   PYTHON_VERSION: "3.11"
+  PYTHONUNBUFFERED: "1"  # Force unbuffered I/O for Modal sandbox tests in CI
 
 jobs:
   # Detect which parts of the codebase changed
@@ -75,13 +76,13 @@ jobs:
           echo "Deploying Modal app to update driver.py..."
           modal deploy backend/modal_runtime/app.py
       
-      # - name: Test Modal sandbox executor (requires Modal tokens)
-      #   env:
-      #     MODAL_TOKEN_ID: ${{ secrets.MODAL_TOKEN_ID }}
-      #     MODAL_TOKEN_SECRET: ${{ secrets.MODAL_TOKEN_SECRET }}
-      #   run: |
-      #     echo "Testing Modal sandbox executor..."
-      #     pytest backend/modal_runtime/tests/test_sandbox.py -v --tb=short -s
+      - name: Test Modal sandbox executor (requires Modal tokens)
+        env:
+          MODAL_TOKEN_ID: ${{ secrets.MODAL_TOKEN_ID }}
+          MODAL_TOKEN_SECRET: ${{ secrets.MODAL_TOKEN_SECRET }}
+        run: |
+          echo "Testing Modal sandbox..."
+          pytest backend/modal_runtime/tests -v --tb=short -s
       
       - name: Test sandbox tools (integration tests with executor.execute)
         env:
@@ -291,7 +292,4 @@ jobs:
   # The functions in backend/modal_runtime/functions.py are DEPRECATED.
   # They are no longer used in production - we use executor.execute() instead.
   # See backend/modal_runtime/functions.py for full explanation.
-  #
-  # If you need to deploy Modal apps (e.g., app.py for sandbox executor),
-  # add a new job here that deploys the specific app you need.
 
