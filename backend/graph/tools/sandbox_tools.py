@@ -558,6 +558,10 @@ print(json.dumps(files))
         stdout = result.get("stdout", "").strip()
         stderr = result.get("stderr", "")
 
+        print(f"[LIST_DATASETS] result: {result}")
+        print(f"[LIST_DATASETS] stdout: '{stdout}'")
+        print(f"[LIST_DATASETS] stderr: '{stderr}'")
+
         if stderr:
             return Command(
                 update={
@@ -597,6 +601,9 @@ print(json.dumps(files))
         )
 
     except Exception as e:
+        print(f"[LIST_DATASETS] Exception: {e}")
+        import traceback
+        traceback.print_exc()
         return Command(
             update={
                 "messages": [

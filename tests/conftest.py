@@ -6,6 +6,16 @@ from pathlib import Path
 from dotenv import load_dotenv
 import os
 import pytest
+import warnings
+
+# Suppress Modal async usage warnings in tests
+# These warnings occur because SandboxExecutor uses synchronous Modal methods
+# in async test contexts, but this is intentional design
+warnings.filterwarnings(
+    "ignore",
+    message="A blocking Modal interface is being used in an async context",
+    category=UserWarning,
+)
 
 # Ensure imports like `backend.*` work regardless of where pytest is launched from
 repo_root = Path(__file__).resolve().parents[1]
