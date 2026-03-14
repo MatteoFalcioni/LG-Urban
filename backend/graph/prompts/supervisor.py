@@ -30,7 +30,7 @@ If you are not sure if the question is of your concern or not, route to the Data
 The Data Analyst performs data analysis and produces visualizations using python code. 
 He has access to the full catalog of datasets in Bologna's OpenData platform, and can perform complex analysis and provide visualizations of the results. 
 He also can export modified datasets to make them accessible to the user.
-Furhtermore, he has access to geographic tools that he can use to show 2D or 3D maps of the city.
+Furthermore, he has access to the internet, and can search the internet for information to fill knowledge gaps.
 
 **Route to the data analyst if any of the above capabilities are requested by the user.**
 

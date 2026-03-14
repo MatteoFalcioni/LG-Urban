@@ -281,6 +281,10 @@ class TestIntegrationFlow:
         # 2. List datasets
         print(f"📋 Step 2: Listing datasets...")
         list_cmd = await list_loaded_datasets_tool.coroutine(mock_runtime)
+        print(f"DEBUG: list_cmd type: {type(list_cmd)}")
+        print(f"DEBUG: list_cmd.update: {list_cmd.update}")
+        print(f"DEBUG: list_cmd.update['messages']: {list_cmd.update['messages']}")
+        print(f"DEBUG: list_cmd.update['messages'][0].content: '{list_cmd.update['messages'][0].content}'")
         list_result = json.loads(list_cmd.update["messages"][0].content)
         
         print(f"✅ Found {len(list_result)} datasets: {list_result}")

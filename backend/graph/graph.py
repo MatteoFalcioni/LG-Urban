@@ -55,6 +55,7 @@ from backend.graph.tools.supervisor_tools import (
     assign_to_report_writer,
     assign_to_reviewer,
 )
+from backend.graph.tools.web_tools import internet_search
 
 load_dotenv()
 
@@ -185,6 +186,7 @@ def make_graph(
         *dataset_tools,
         # *sit_tools,
         *report_tools,
+        internet_search,
     ]
 
     # Summarizer for middleware (via OpenRouter)
@@ -312,8 +314,9 @@ def make_graph(
         code_tokens = reviewer_llm.get_num_tokens(code_logs_str)
         if code_tokens > 5000:
             # here we split the code logs into big chunks of 5000 tokens each, with big overlap for more context;
+            mdl_name = reviewer_llm.model_name.split('/')[-1]
             splitter = TokenTextSplitter(
-                model_name=reviewer_llm.model_name,  # now using gpt4.1; otherwise, cl100k_base is more model agnostic, and it's the same that get_num_tokens uses for claude models
+                model_name=mdl_name,  # now using gpt4.1; otherwise, cl100k_base is more model agnostic, and it's the same that get_num_tokens uses for claude models
                 chunk_size=5000,
                 chunk_overlap=1000,
             )

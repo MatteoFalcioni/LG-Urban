@@ -1526,7 +1526,15 @@ async def post_message_stream(
             clear_db_session()
             clear_thread_id()
 
-    return StreamingResponse(event_stream(), media_type="text/event-stream")
+    return StreamingResponse(
+        event_stream(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache, no-transform",
+            "X-Accel-Buffering": "no",  # Disable Nginx buffering
+            "Connection": "keep-alive",
+        }
+    )
 
 
 # Resume endpoint for handling interrupts (human-in-the-loop)
@@ -2096,7 +2104,15 @@ async def continue_thread(
             clear_db_session()
             clear_thread_id()
 
-    return StreamingResponse(stream_continue(), media_type="text/event-stream")
+    return StreamingResponse(
+        stream_continue(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache, no-transform",
+            "X-Accel-Buffering": "no",
+            "Connection": "keep-alive",
+        }
+    )
 
 
 @router.post("/threads/{thread_id}/resume")
@@ -2718,7 +2734,15 @@ async def resume_thread(
             clear_db_session()
             clear_thread_id()
 
-    return StreamingResponse(stream_resume(), media_type="text/event-stream")
+    return StreamingResponse(
+        stream_resume(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache, no-transform",
+            "X-Accel-Buffering": "no",
+            "Connection": "keep-alive",
+        }
+    )
 
 
 # API Key Management Endpoints
