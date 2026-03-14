@@ -127,7 +127,10 @@ Visit `http://localhost:5173` 🎉
       │        │          │
   ┌───▼──────┐ │    ┌─────▼──────┐
   │PostgreSQL│ │    │   AWS S3   │
-  │(Railway) │ │    │(artifacts) │
+  │(Railway) │ │    │(artifacts  │
+  │          │ │    │     +      │
+  │          │ │    │  datasets  │
+  │          │ │    │   caching) │
   │          │ │    └────────────┘
   │ •App DB  │ │
   │ •LG CKPTs│ │    
