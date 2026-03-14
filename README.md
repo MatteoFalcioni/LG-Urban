@@ -50,8 +50,8 @@ Want to run locally instead of using the web app?
 
 ### 1. 📥 Clone & Install
 ```bash
-git clone https://github.com/your-username/LG-Urban.git
-cd LG-Urban
+git clone https://github.com/your-username/UrbIA.git
+cd UrbIA
 
 # Backend dependencies
 pip install -r requirements.txt
@@ -85,7 +85,7 @@ alembic upgrade head
 
 ### 4. ▶️ Run Backend
 ```bash
-cd ~/LG-Urban
+cd ~/UrbIA
 uvicorn backend.main:app --reload --port 8000
 ```
 
