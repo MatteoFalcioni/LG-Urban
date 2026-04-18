@@ -121,9 +121,11 @@ def driver_program():
             # Use input() like Modal's example - cleaner than sys.stdin.readline()
             line = input()
             command = json.loads(line)
+            request_id = command.get("request_id")
 
             if (code := command.get("code")) is None:
                 result = {
+                    "request_id": request_id,
                     "error": "No code to execute",
                     "stdout": "",
                     "stderr": "",
@@ -167,6 +169,7 @@ def driver_program():
 
             # Emit exactly one JSON line per command
             result = {
+                "request_id": request_id,
                 "stdout": stdout_io.getvalue(),
                 "stderr": stderr_io.getvalue(),
                 "artifacts": artifacts,
@@ -179,6 +182,7 @@ def driver_program():
             break
         except json.JSONDecodeError:
             error_result = {
+                "request_id": None,
                 "error": "Invalid JSON",
                 "stdout": "",
                 "stderr": "",
@@ -188,6 +192,7 @@ def driver_program():
         except Exception as e:
             # Minimal error handling - don't pollute stderr with tracebacks
             error_result = {
+                "request_id": None,
                 "error": f"Driver error: {e}",
                 "stdout": "",
                 "stderr": str(e),

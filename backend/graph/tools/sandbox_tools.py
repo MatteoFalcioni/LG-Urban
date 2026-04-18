@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import os
 import json
-import base64
 import asyncio
+import logging
 from concurrent.futures import ThreadPoolExecutor
 from typing import Dict
 from typing_extensions import Annotated
@@ -20,10 +20,15 @@ from backend.modal_runtime.executor import SandboxExecutor
 from backend.modal_runtime.session import session_base_dir
 from backend.graph.context import get_thread_id
 
+# Set up logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
 # ===== helpers =====
 
 # Session-based executor cache: one sandbox per session
 _executor_cache: Dict[str, SandboxExecutor] = {}
+_executor_cache_lock = asyncio.Lock()
 
 # Thread pool for blocking Modal operations
 _modal_thread_pool = ThreadPoolExecutor(max_workers=4)
@@ -46,19 +51,64 @@ def get_or_create_executor(session_id: str) -> SandboxExecutor:
     return _executor_cache[session_id]
 
 
+def terminate_session_executor(session_id: str) -> None:
+    """Terminate and cleanup executor for a session."""
+    if session_id in _executor_cache:
+        executor = _executor_cache.pop(session_id)
+        executor.terminate()
+
+
+async def _check_executor_health(executor: SandboxExecutor) -> bool:
+    """Check if the executor's sandbox process is still alive (async version).
+    
+    Returns True if healthy, False if the process has died.
+    """
+    try:
+        if executor.process is None:
+            logger.warning("[SANDBOX] Executor has no process")
+            return False
+        # Use async interface to avoid blocking event loop
+        returncode = await executor.process.poll.aio()
+        if returncode is not None:
+            logger.warning(f"[SANDBOX] Process died with code {returncode}")
+            return False
+        return True
+    except Exception as e:
+        logger.warning(f"[SANDBOX] Error checking health: {e}")
+        return False
+
+
 async def async_get_or_create_executor(session_id: str) -> SandboxExecutor:
     """Async version that creates executor in thread pool to avoid blocking event loop.
     
     Use this in async tools to prevent the Modal sandbox creation from blocking FastAPI.
+    Includes health check to recreate executor if the sandbox has died.
     """
     if session_id in _executor_cache:
-        return _executor_cache[session_id]
-    
-    # Create executor in thread pool to avoid blocking
-    loop = asyncio.get_running_loop()
-    executor = await loop.run_in_executor(_modal_thread_pool, _create_executor_sync, session_id)
-    _executor_cache[session_id] = executor
-    return executor
+        executor = _executor_cache[session_id]
+        # Check if the sandbox is still alive (async)
+        if not await _check_executor_health(executor):
+            logger.warning(f"[SANDBOX] Executor for session {session_id} is unhealthy, recreating...")
+            terminate_session_executor(session_id)
+        else:
+            return executor
+
+    async with _executor_cache_lock:
+        # Double-check after acquiring lock
+        if session_id in _executor_cache:
+            executor = _executor_cache[session_id]
+            if not await _check_executor_health(executor):
+                logger.warning(f"[SANDBOX] Executor for session {session_id} is unhealthy, recreating...")
+                terminate_session_executor(session_id)
+            else:
+                return executor
+
+        # Create executor in thread pool to avoid blocking
+        loop = asyncio.get_running_loop()
+        executor = await loop.run_in_executor(_modal_thread_pool, _create_executor_sync, session_id)
+        _executor_cache[session_id] = executor
+        logger.info(f"[SANDBOX] Created new executor for session {session_id}")
+        return executor
 
 
 def terminate_session_executor(session_id: str) -> None:
@@ -363,78 +413,111 @@ print(json.dumps(result))
                 os.unlink(temp_path)
             print("Cleanup complete")
 
-        # Write dataset directly to sandbox using executor.execute()
-        print("Encoding base64...")
-        data_b64 = base64.b64encode(data_bytes).decode("utf-8")
-        # Use repr() to safely pass the base64 string in the f-string
-        write_code = f"""
-import base64
+        # FIX: Write dataset from INSIDE the sandbox using stdin to avoid volume sync issues
+        # External writes via batch_upload() are NOT visible to running sandboxes
+        print(f"[LOAD_DATASET] Writing to volume for session {session_id}...")
+        base_dir = session_base_dir(session_id)
+        datasets_dir = f"{base_dir}/datasets"
+        remote_path = f"{datasets_dir}/{dataset_id}.parquet"
+        
+        # First ensure the datasets directory exists in the sandbox
+        print("[LOAD_DATASET] Creating datasets directory...")
+        mkdir_proc = executor.sandbox.exec("mkdir", "-p", datasets_dir)
+        mkdir_proc.wait()
+        
+        # Write file from inside sandbox using cat with stdin
+        # This ensures the file is written by the sandbox itself and is immediately visible
+        try:
+            print(f"[LOAD_DATASET] Writing {len(data_bytes)} bytes to {remote_path} via sandbox stdin...")
+            write_proc = executor.sandbox.exec("sh", "-c", f"cat > {remote_path}")
+            
+            # Write in chunks to avoid buffer overflow
+            # Use larger chunks for file uploads (256KB) vs code execution (8KB)
+            # Larger chunks = fewer network round-trips = much faster for big files
+            chunk_size = 512 * 1024  # 512KB chunks
+            for i in range(0, len(data_bytes), chunk_size):
+                chunk = data_bytes[i : i + chunk_size]
+                write_proc.stdin.write(chunk)
+                write_proc.stdin.drain()  # Flush after each chunk to prevent buffer overflow
+            
+            # Modal StreamWriter uses write_eof() instead of close()
+            write_proc.stdin.write_eof()
+            write_proc.stdin.drain()  # Ensure EOF is sent
+            exit_code = write_proc.wait()
+            
+            if exit_code != 0:
+                stderr_output = write_proc.stderr.read()
+                raise Exception(f"Write failed with exit code {exit_code}: {stderr_output}")
+            
+            print(f"[LOAD_DATASET] Successfully written to {remote_path}")
+        except Exception as vol_err:
+            print(f"[LOAD_DATASET] Volume write error: {vol_err}")
+            return Command(
+                update={
+                    "messages": [
+                        ToolMessage(
+                            content=f"Error: Failed to write dataset to volume: {vol_err}",
+                            tool_call_id=runtime.tool_call_id,
+                        )
+                    ]
+                }
+            )
+        
+        # Now verify the file exists in sandbox and get metadata
+        check_code = f"""
 import os
 import json
 from pathlib import Path
 
-# Decode and write the dataset
-data_b64 = {repr(data_b64)}
-data = base64.b64decode(data_b64)
-datasets_dir = Path('datasets')
-datasets_dir.mkdir(exist_ok=True)
-path = datasets_dir / '{dataset_id}.parquet'
-path.write_bytes(data)
-
-# Get metadata
-size_bytes = len(data)
-# rel_path is relative to workdir (datasets/{dataset_id}.parquet)
-rel_path = str(path)
-# path should be absolute - resolve() gives absolute path
-abs_path = str(path.resolve())
-
-result = {{
-    "dataset_id": "{dataset_id}",
-    "path": abs_path,
-    "rel_path": rel_path,
-    "size_bytes": size_bytes,
-    "size_mb": round(size_bytes / (1024 * 1024), 3),
-    "ext": "parquet"
-}}
-
+path = Path('datasets/{dataset_id}.parquet')
+if path.exists():
+    size_bytes = path.stat().st_size
+    result = {{
+        "dataset_id": "{dataset_id}",
+        "path": str(path.resolve()),
+        "rel_path": "datasets/{dataset_id}.parquet",
+        "size_bytes": size_bytes,
+        "size_mb": round(size_bytes / (1024 * 1024), 3),
+        "ext": "parquet"
+    }}
+else:
+    result = {{"error": "File not found after volume write"}}
 print(json.dumps(result))
 """
-        print("Executing write code in sandbox...")
-        # Run blocking executor.execute() in thread pool with timeout
+        print("Verifying file in sandbox...")
         loop = asyncio.get_running_loop()
         try:
-            write_result = await asyncio.wait_for(
-                loop.run_in_executor(None, executor.execute, write_code),
+            verify_result = await asyncio.wait_for(
+                loop.run_in_executor(None, executor.execute, check_code),
                 timeout=120.0  # 2 minute timeout for writing dataset
             )
-            print("Write code executed")
         except asyncio.TimeoutError:
             return Command(
                 update={
                     "messages": [
                         ToolMessage(
-                            content=f"Error: Timeout writing dataset '{dataset_id}' to sandbox. The sandbox may be unresponsive.",
+                            content=f"Error: Timeout verifying dataset '{dataset_id}' in sandbox.",
                             tool_call_id=runtime.tool_call_id,
                         )
                     ]
                 }
             )
-
-        stdout = write_result.get("stdout", "").strip()
-        stderr = write_result.get("stderr", "")
-
+        
+        stdout = verify_result.get("stdout", "").strip()
+        stderr = verify_result.get("stderr", "")
+        
         if stderr:
             return Command(
                 update={
                     "messages": [
                         ToolMessage(
-                            content=f"Error: Failed to write dataset to sandbox: {stderr}",
+                            content=f"Error: Failed to verify dataset in sandbox: {stderr}",
                             tool_call_id=runtime.tool_call_id,
                         )
                     ]
                 }
             )
-
+        
         try:
             result = json.loads(stdout) if stdout else {}
             if "error" in result:
@@ -453,7 +536,7 @@ print(json.dumps(result))
                 update={
                     "messages": [
                         ToolMessage(
-                            content=f"Error: Failed to parse write result. Output: {stdout}",
+                            content=f"Error: Failed to parse verify result. Output: {stdout}",
                             tool_call_id=runtime.tool_call_id,
                         )
                     ]
