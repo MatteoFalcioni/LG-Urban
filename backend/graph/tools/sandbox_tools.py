@@ -111,13 +111,6 @@ async def async_get_or_create_executor(session_id: str) -> SandboxExecutor:
         return executor
 
 
-def terminate_session_executor(session_id: str) -> None:
-    """Terminate and cleanup executor for a session."""
-    if session_id in _executor_cache:
-        executor = _executor_cache.pop(session_id)
-        executor.terminate()
-
-
 # ===== tools =====
 
 
