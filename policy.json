@@ -4,8 +4,11 @@
       {
         "Sid": "ListBucketOnPrefixes",
         "Effect": "Allow",
+        "Principal": {
+          "AWS": "arn:aws:iam::511582926637:root"
+        },
         "Action": ["s3:ListBucket"],
-        "Resource": "arn:aws:s3:::lg-urban-prod",
+        "Resource": "arn:aws:s3:::urbia-prod",
         "Condition": {
           "StringLike": {
             "s3:prefix": ["input/*", "output/*", "tests/*"]
@@ -15,26 +18,38 @@
       {
         "Sid": "ReadInputDatasets",
         "Effect": "Allow",
+        "Principal": {
+          "AWS": "arn:aws:iam::511582926637:root"
+        },
         "Action": ["s3:GetObject"],
-        "Resource": "arn:aws:s3:::lg-urban-prod/input/*"
+        "Resource": "arn:aws:s3:::urbia-prod/input/*"
       },
       {
         "Sid": "WriteInputDatasets",
         "Effect": "Allow",
+        "Principal": {
+          "AWS": "arn:aws:iam::511582926637:root"
+        },
         "Action": ["s3:PutObject", "s3:DeleteObject"],
-        "Resource": "arn:aws:s3:::lg-urban-prod/input/datasets/*"
+        "Resource": "arn:aws:s3:::urbia-prod/input/datasets/*"
       },
       {
         "Sid": "RWOutput",
         "Effect": "Allow",
+        "Principal": {
+          "AWS": "arn:aws:iam::511582926637:root"
+        },
         "Action": ["s3:PutObject", "s3:GetObject"],
-        "Resource": "arn:aws:s3:::lg-urban-prod/output/*"
+        "Resource": "arn:aws:s3:::urbia-prod/output/*"
       },
       {
         "Sid": "RWDTests",
         "Effect": "Allow",
+        "Principal": {
+          "AWS": "arn:aws:iam::511582926637:root"
+        },
         "Action": ["s3:PutObject", "s3:GetObject", "s3:DeleteObject"],
-        "Resource": "arn:aws:s3:::lg-urban-prod/tests/*"
+        "Resource": "arn:aws:s3:::urbia-prod/tests/*"
       }
     ]
   }
