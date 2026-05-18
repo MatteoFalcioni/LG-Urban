@@ -377,7 +377,7 @@ export function MessageInput() {
         setCurrentThreadId(newThread.id);
         threadId = newThread.id;
         // Initialize context usage for new thread
-        setContextUsage(0, defaultConfig.context_window ?? 64000);
+        setContextUsage(0, defaultConfig.context_window ?? 200000);
 
         // Apply default config to new thread if any config is set
         if (defaultConfig.model || defaultConfig.temperature !== null || defaultConfig.system_prompt || defaultConfig.context_window !== null) {

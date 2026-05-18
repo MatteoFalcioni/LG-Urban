@@ -145,6 +145,10 @@ def make_graph(
         openrouter_model_name = f"openai/{model_name}"
     elif model_name.startswith("claude-"):
         openrouter_model_name = f"anthropic/{model_name}"
+    elif model_name.startswith("kimi-"):
+        openrouter_model_name = f"moonshot/{model_name}"
+    elif model_name.startswith("minimax-"):
+        openrouter_model_name = f"minimax/{model_name}"
     else:
         # Assume it's already in OpenRouter format or a valid model name
         openrouter_model_name = model_name

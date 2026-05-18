@@ -219,7 +219,7 @@ export function SettingsPage() {
             <div>
               <label className="block text-sm font-medium mb-2">Model</label>
               <select
-                value={config.model || defaultConfig.model || 'gpt-4.1'}
+                value={config.model || defaultConfig.model || 'claude-sonnet-4.6'}
                 onChange={(e) => {
                   console.log('Model changed to:', e.target.value);
                   setConfig((prev) => ({ ...prev, model: e.target.value }));
@@ -227,7 +227,7 @@ export function SettingsPage() {
                 onFocus={() => {
                   console.log('Select focused - current config.model:', config.model);
                   console.log('Select focused - defaultConfig.model:', defaultConfig.model);
-                  console.log('Select focused - computed value:', config.model || defaultConfig.model || 'gpt-4.1');
+                  console.log('Select focused - computed value:', config.model || defaultConfig.model || 'claude-sonnet-4.6');
                 }}
                 className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-gray-800 dark:focus:ring-gray-600 focus:border-gray-800 dark:focus:border-gray-600 transition-all outline-none"
                 style={{ 
@@ -236,9 +236,11 @@ export function SettingsPage() {
                   color: 'var(--text-primary)'
                 }}
               >
-                <option value="gpt-4.1">GPT-4.1</option>
-                <option value="claude-sonnet-4-5">Claude Sonnet 4.5</option>
-                <option value="claude-haiku-4-5">Claude Haiku 4.5</option>
+                <option value="gpt-5.5">GPT-5.5</option>
+                <option value="kimi-k2.6">Kimi k2.6</option>
+                <option value="minimax-m2.5">MiniMax M2.5</option>
+                <option value="claude-sonnet-4.6">Claude Sonnet 4.6</option>
+                <option value="claude-opus-4.6">Claude Opus 4.6</option>
               </select>
             </div>
 
@@ -268,14 +270,14 @@ export function SettingsPage() {
             {/* Context Window */}
             <div>
               <label className="block text-sm font-medium mb-2">
-                Context Window: {(config.context_window ?? defaultConfig.context_window ?? 64000).toLocaleString()} tokens
+                Context Window: {(config.context_window ?? defaultConfig.context_window ?? 200000).toLocaleString()} tokens
               </label>
               <input
                 type="number"
                 min="1000"
                 max="200000"
                 step="1000"
-                value={config.context_window ?? defaultConfig.context_window ?? 64000}
+                value={config.context_window ?? defaultConfig.context_window ?? 200000}
                 onChange={(e) => setConfig((prev) => ({ ...prev, context_window: parseInt(e.target.value) }))}
                 className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-gray-800 dark:focus:ring-gray-600 focus:border-gray-800 dark:focus:border-gray-600 transition-all outline-none"
                 style={{ 
@@ -285,12 +287,12 @@ export function SettingsPage() {
                 }}
               />
               <p className="text-xs text-gray-500 dark:text-slate-400 mt-1">
-                Maximum context size before summarization (default: 64k context window)
+                Maximum context size before summarization (default: 200k context window)
               </p>
-              {(config.context_window ?? defaultConfig.context_window ?? 64000) > 64000 && (
+              {(config.context_window ?? defaultConfig.context_window ?? 200000) > 200000 && (
                 <div className="mt-2 p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
                   <p className="text-xs text-yellow-800 dark:text-yellow-200">
-                    ⚠️ <strong>Note:</strong> Context windows larger than 64k may not be supported by all models. Check OpenRouter model documentation for supported context sizes.
+                    ⚠️ <strong>Note:</strong> Context windows larger than 200k may not be supported by all models. Check OpenRouter model documentation for supported context sizes.
                   </p>
                 </div>
               )}
