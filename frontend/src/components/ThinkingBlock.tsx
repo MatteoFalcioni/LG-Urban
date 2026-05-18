@@ -25,16 +25,16 @@ export function ThinkingBlock({ content }: ThinkingBlockProps) {
       >
         {/* Brain emoji icon */}
         <span className="text-lg flex-shrink-0 animate-pulse">🧠</span>
-        
+
         {/* "Thinking..." label */}
-        <span className="text-sm font-medium text-gray-500 dark:text-gray-400 
+        <span className="text-sm font-medium text-gray-500 dark:text-gray-400
                          opacity-70 group-hover:opacity-90 transition-opacity">
           Thinking...
         </span>
-        
+
         {/* Expand/collapse arrow */}
         <svg
-          className={`w-4 h-4 ml-auto text-gray-400 transition-transform duration-200 
+          className={`w-4 h-4 ml-auto text-gray-400 transition-transform duration-200
                       ${isExpanded ? 'rotate-180' : ''}`}
           fill="none"
           stroke="currentColor"
@@ -52,7 +52,7 @@ export function ThinkingBlock({ content }: ThinkingBlockProps) {
                      border border-gray-200/30 dark:border-gray-700/30
                      animate-fadeIn"
         >
-          <p className="text-sm text-gray-600 dark:text-gray-400 
+          <p className="text-sm text-gray-600 dark:text-gray-400
                         opacity-70 whitespace-pre-wrap leading-relaxed">
             {content}
           </p>
@@ -61,4 +61,3 @@ export function ThinkingBlock({ content }: ThinkingBlockProps) {
     </div>
   );
 }
-

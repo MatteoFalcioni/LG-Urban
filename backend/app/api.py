@@ -1,23 +1,22 @@
 from __future__ import annotations
 
-from typing import Optional, Any
+import json
+import logging
+import time
+import uuid
 from datetime import datetime, timezone
+from typing import Any, Optional
 from uuid import UUID
 
-import logging
-import uuid
-import json
-import time
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
-from sqlalchemy import select, case
+from sqlalchemy import case, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from backend.db.models import Config, Message, Thread, UserAPIKeys
 from backend.db.session import get_session
-from backend.db.models import Thread, Message, Config, UserAPIKeys
-from backend.utils.encryption import encrypt_api_key, decrypt_api_key, mask_api_key
-
+from backend.utils.encryption import decrypt_api_key, encrypt_api_key, mask_api_key
 
 # API router for thread- and message-related endpoints, mounted under /api
 router = APIRouter()
@@ -345,11 +344,12 @@ async def llm_update_thread_title(
         )
 
     # Generate title with LLM
-    from langchain_openai import ChatOpenAI
-    from langchain_core.prompts import ChatPromptTemplate
-    from langchain_core.output_parsers import StrOutputParser
-    from pydantic import SecretStr
     import os
+
+    from langchain_core.output_parsers import StrOutputParser
+    from langchain_core.prompts import ChatPromptTemplate
+    from langchain_openai import ChatOpenAI
+    from pydantic import SecretStr
 
     # Get user API keys
     user_api_keys = await get_user_api_keys_for_llm(t.user_id, session)
@@ -401,7 +401,7 @@ async def get_default_config() -> ConfigOut:
     """
     Get default config from environment variables (no thread required).
     """
-    from backend.config import DEFAULT_MODEL, DEFAULT_TEMPERATURE, CONTEXT_WINDOW
+    from backend.config import CONTEXT_WINDOW, DEFAULT_MODEL, DEFAULT_TEMPERATURE
 
     return ConfigOut(
         model=DEFAULT_MODEL,
@@ -420,8 +420,9 @@ async def get_thread_config(
     Get thread-specific config (model, temperature, system_prompt).
     Returns defaults if no config exists.
     """
-    from backend.config import DEFAULT_MODEL, DEFAULT_TEMPERATURE
     from sqlalchemy import select
+
+    from backend.config import DEFAULT_MODEL, DEFAULT_TEMPERATURE
 
     try:
         thread_uuid = UUID(thread_id)
@@ -536,9 +537,9 @@ async def get_thread_state(
     Get the current LangGraph state for a thread, including token count.
     This allows the frontend to display context usage without sending a message.
     """
+    from backend.config import CONTEXT_WINDOW as DEFAULT_CONTEXT_WINDOW
     from backend.graph.graph import make_graph
     from backend.main import _checkpointer_cm
-    from backend.config import CONTEXT_WINDOW as DEFAULT_CONTEXT_WINDOW
 
     # Ensure thread exists
     t = await session.get(Thread, thread_id)
@@ -587,7 +588,9 @@ async def get_thread_state(
             state_snapshot.values.get("final_score") if state_snapshot.values else None
         )
         analysis_status = (
-            state_snapshot.values.get("analysis_status") if state_snapshot.values else None
+            state_snapshot.values.get("analysis_status")
+            if state_snapshot.values
+            else None
         )
         context_window = (
             cfg.context_window
@@ -645,8 +648,8 @@ async def list_messages(
     Only finalized messages are stored and returned (no partial tokens).
     Includes artifacts associated with each message via tool_call_id.
     """
-    from backend.db.models import Artifact
     from backend.artifacts.storage import generate_artifact_download_url
+    from backend.db.models import Artifact
 
     stmt = (
         select(Message)
@@ -824,11 +827,13 @@ async def post_message_stream(
     # This runs in background and won't block the response stream
     async def auto_title_from_first_message():
         try:
-            from langchain_openai import ChatOpenAI
-            from langchain_core.prompts import ChatPromptTemplate
-            from langchain_core.output_parsers import StrOutputParser
-            from pydantic import SecretStr
             import os
+
+            from langchain_core.output_parsers import StrOutputParser
+            from langchain_core.prompts import ChatPromptTemplate
+            from langchain_openai import ChatOpenAI
+            from pydantic import SecretStr
+
             from backend.db.session import ASYNC_SESSION_MAKER
 
             async with ASYNC_SESSION_MAKER() as title_sess:
@@ -901,21 +906,36 @@ async def post_message_stream(
 
     # Stream LangGraph agent response via SSE
     async def event_stream():
-        from backend.main import get_thread_lock
-        from backend.graph.graph import make_graph
-        from backend.main import _checkpointer_cm
+        import time
+        import uuid as uuid_module
+
         from backend.db.session import ASYNC_SESSION_MAKER
         from backend.graph.context import (
-            set_db_session,
-            set_thread_id,
             clear_db_session,
             clear_thread_id,
+            set_db_session,
+            set_thread_id,
         )
-        import uuid as uuid_module
+        from backend.graph.graph import make_graph
+        from backend.main import _checkpointer_cm, get_thread_lock
 
         if not _checkpointer_cm:
             yield f"data: {json.dumps({'error': 'Checkpointer not initialized'})}\n\n"
             return
+
+        # Track last activity for keepalive (prevents proxy timeout)
+        last_activity = [time.time()]  # Use list for mutable reference
+
+        def update_activity():
+            """Update last activity timestamp"""
+            last_activity[0] = time.time()
+
+        async def send_keepalive_if_needed():
+            """Send keepalive comment if no activity for 15 seconds"""
+            if time.time() - last_activity[0] > 15:
+                update_activity()
+                return ": keepalive\n\n"
+            return None
 
         # Wait for auto-titling to complete and emit event if successful
         try:
@@ -974,22 +994,22 @@ async def post_message_stream(
                 current_agent_node = None  # Track which agent we're currently executing (supervisor, data_analyst, etc.)
                 # Track streamed content for database storage - separate for each agent
                 supervisor_content = ""  # Supervisor messages (main response)
-                subagent_content = (
-                    {}
-                )  # Subagent messages: {"data_analyst": "", "report_writer": "", "reviewer": ""}
-                subagent_order = (
-                    []
-                )  # Track execution order: ["data_analyst", "reviewer", ...]
+                subagent_content = {}  # Subagent messages: {"data_analyst": "", "report_writer": "", "reviewer": ""}
+                subagent_order = []  # Track execution order: ["data_analyst", "reviewer", ...]
                 # Track segments for each agent (saved when tools start)
-                subagent_segments = (
-                    {}
-                )  # {"data_analyst": [{"content": "...", "segment_index": 0}, ...]}
+                subagent_segments = {}  # {"data_analyst": [{"content": "...", "segment_index": 0}, ...]}
                 subagent_segment_counters = {}  # Track segment index per agent
 
                 # Track the last known agent node to handle cases where node becomes "model"/"tools"
                 last_known_agent_node = None
 
                 async for event in graph.astream_events(state, config, version="v2"):
+                    # Send keepalive if needed
+                    keepalive = await send_keepalive_if_needed()
+                    if keepalive:
+                        yield keepalive
+
+                    update_activity()  # Update on each event
                     event_type = event.get("event")
                     event_name = event.get("name", "")
                     event_meta = event.get("metadata", {})
@@ -1279,11 +1299,11 @@ async def post_message_stream(
                         }
                         if artifacts:
                             # Convert S3 keys to presigned HTTP URLs and save to database
-                            from backend.artifacts.storage import (
-                                generate_presigned_url_from_s3_key,
-                            )
                             from backend.artifacts.ingest import (
                                 ingest_artifact_metadata,
+                            )
+                            from backend.artifacts.storage import (
+                                generate_presigned_url_from_s3_key,
                             )
 
                             # Save artifacts to DB immediately with separate session (commit before SSE send)
@@ -1399,7 +1419,9 @@ async def post_message_stream(
                             ),
                         )
                         write_sess.add(a_msg)
-                        await write_sess.flush()  # Flush to get the ID and commit timestamp
+                        await (
+                            write_sess.flush()
+                        )  # Flush to get the ID and commit timestamp
                         a_msg_id = str(a_msg.id)
 
                     # Small delay to ensure supervisor message has earlier timestamp
@@ -1533,15 +1555,13 @@ async def post_message_stream(
             "Cache-Control": "no-cache, no-transform",
             "X-Accel-Buffering": "no",  # Disable Nginx buffering
             "Connection": "keep-alive",
-        }
+        },
     )
 
 
 # Resume endpoint for handling interrupts (human-in-the-loop)
 class ResumeRequest(BaseModel):
-    resume_value: (
-        dict
-    )  # dictionary of values 
+    resume_value: dict  # dictionary of values
 
 
 @router.post("/threads/{thread_id}/continue")
@@ -1558,15 +1578,16 @@ async def continue_thread(
     The checkpointer automatically saves state after each node execution, so we can
     resume by calling the graph with None (empty state update) and the same thread_id.
     """
-    from backend.graph.graph import make_graph
-    from backend.main import get_thread_lock, _checkpointer_cm
+    import uuid as uuid_module
+
     from backend.graph.context import (
-        set_db_session,
-        set_thread_id,
         clear_db_session,
         clear_thread_id,
+        set_db_session,
+        set_thread_id,
     )
-    import uuid as uuid_module
+    from backend.graph.graph import make_graph
+    from backend.main import _checkpointer_cm, get_thread_lock
 
     # Verify checkpointer is initialized
     if not _checkpointer_cm:
@@ -1891,11 +1912,11 @@ async def continue_thread(
                             "output": tool_output_for_db,
                         }
                         if artifacts:
-                            from backend.artifacts.storage import (
-                                generate_presigned_url_from_s3_key,
-                            )
                             from backend.artifacts.ingest import (
                                 ingest_artifact_metadata,
+                            )
+                            from backend.artifacts.storage import (
+                                generate_presigned_url_from_s3_key,
                             )
 
                             saved_artifact_dicts = []
@@ -2111,7 +2132,7 @@ async def continue_thread(
             "Cache-Control": "no-cache, no-transform",
             "X-Accel-Buffering": "no",
             "Connection": "keep-alive",
-        }
+        },
     )
 
 
@@ -2128,16 +2149,18 @@ async def resume_thread(
 
     Resume value format is a dict for all interrupts. Currently (23/12/2025) interrupt is only used in assigning to report writer.
     """
-    from backend.graph.graph import make_graph
-    from backend.main import get_thread_lock, _checkpointer_cm
+    import uuid as uuid_module
+
+    from langgraph.types import Command
+
     from backend.graph.context import (
-        set_db_session,
-        set_thread_id,
         clear_db_session,
         clear_thread_id,
+        set_db_session,
+        set_thread_id,
     )
-    from langgraph.types import Command
-    import uuid as uuid_module
+    from backend.graph.graph import make_graph
+    from backend.main import _checkpointer_cm, get_thread_lock
 
     # Verify checkpointer is initialized
     if not _checkpointer_cm:
@@ -2184,20 +2207,12 @@ async def resume_thread(
                 current_agent_node = None  # Track which agent we're currently executing
                 # Track streamed content for database storage - separate for each agent
                 supervisor_content = ""  # Supervisor messages (main response)
-                subagent_content = (
-                    {}
-                )  # Subagent messages: {"data_analyst": "", "report_writer": "", "reviewer": ""}
-                subagent_order = (
-                    []
-                )  # Track execution order: ["data_analyst", "reviewer", ...]
+                subagent_content = {}  # Subagent messages: {"data_analyst": "", "report_writer": "", "reviewer": ""}
+                subagent_order = []  # Track execution order: ["data_analyst", "reviewer", ...]
                 # Track segments for each agent (saved when tools start)
-                subagent_segments = (
-                    {}
-                )  # {"data_analyst": [{"content": "...", "segment_index": 0}, ...]}
+                subagent_segments = {}  # {"data_analyst": [{"content": "...", "segment_index": 0}, ...]}
                 subagent_segment_counters = {}  # Track segment index per agent
-                tool_calls = (
-                    []
-                )  # Track tool calls for persistence (same as POST /messages)
+                tool_calls = []  # Track tool calls for persistence (same as POST /messages)
 
                 # Track the last known agent node to handle cases where node becomes "model"/"tools"
                 last_known_agent_node = None
@@ -2206,7 +2221,9 @@ async def resume_thread(
                 resume_message_id = str(uuid_module.uuid4())
 
                 # Log resume value for debugging
-                logging.info(f"[RESUME] Thread {thread_id} - Resume value type: {type(payload.resume_value)}, value: {payload.resume_value}")
+                logging.info(
+                    f"[RESUME] Thread {thread_id} - Resume value type: {type(payload.resume_value)}, value: {payload.resume_value}"
+                )
 
                 # Resume with Command(resume=resume_value) using SAME graph and config
                 async for event in graph.astream_events(
@@ -2495,11 +2512,11 @@ async def resume_thread(
                         }
                         if artifacts:
                             # Handle artifacts same as POST /messages
-                            from backend.artifacts.storage import (
-                                generate_presigned_url_from_s3_key,
-                            )
                             from backend.artifacts.ingest import (
                                 ingest_artifact_metadata,
+                            )
+                            from backend.artifacts.storage import (
+                                generate_presigned_url_from_s3_key,
                             )
                             from backend.db.session import ASYNC_SESSION_MAKER
 
@@ -2615,7 +2632,9 @@ async def resume_thread(
                             ),
                         )
                         write_sess.add(a_msg)
-                        await write_sess.flush()  # Flush to get the ID and commit timestamp
+                        await (
+                            write_sess.flush()
+                        )  # Flush to get the ID and commit timestamp
                         a_msg_id = str(a_msg.id)
 
                     # Small delay to ensure supervisor message has earlier timestamp
@@ -2741,7 +2760,7 @@ async def resume_thread(
             "Cache-Control": "no-cache, no-transform",
             "X-Accel-Buffering": "no",
             "Connection": "keep-alive",
-        }
+        },
     )
 
 
@@ -2765,19 +2784,23 @@ async def get_user_api_keys(user_id: str, session: AsyncSession = Depends(get_se
     """Get user's API keys (masked for security)."""
     start_time = time.time()
     logging.info(f"[API-KEYS] Starting fetch for user {user_id}")
-    
+
     try:
         result = await session.execute(
             select(UserAPIKeys).where(UserAPIKeys.user_id == user_id)
         )
         query_time = time.time() - start_time
-        logging.info(f"[API-KEYS] Query completed in {query_time:.3f}s for user {user_id}")
-        
+        logging.info(
+            f"[API-KEYS] Query completed in {query_time:.3f}s for user {user_id}"
+        )
+
         user_keys = result.scalar_one_or_none()
 
         if not user_keys:
             total_time = time.time() - start_time
-            logging.info(f"[API-KEYS] No keys found. Total time: {total_time:.3f}s for user {user_id}")
+            logging.info(
+                f"[API-KEYS] No keys found. Total time: {total_time:.3f}s for user {user_id}"
+            )
             return APIKeysResponse()
 
         response = APIKeysResponse(
@@ -2797,13 +2820,17 @@ async def get_user_api_keys(user_id: str, session: AsyncSession = Depends(get_se
                 else None
             ),
         )
-        
+
         total_time = time.time() - start_time
-        logging.info(f"[API-KEYS] Success. Total time: {total_time:.3f}s for user {user_id}")
+        logging.info(
+            f"[API-KEYS] Success. Total time: {total_time:.3f}s for user {user_id}"
+        )
         return response
     except Exception as e:
         error_time = time.time() - start_time
-        logging.error(f"[API-KEYS] Error after {error_time:.3f}s for user {user_id}: {str(e)}")
+        logging.error(
+            f"[API-KEYS] Error after {error_time:.3f}s for user {user_id}: {str(e)}"
+        )
         raise
 
 
@@ -2834,7 +2861,7 @@ async def save_user_api_keys(
         user_keys.anthropic_key = (
             encrypt_api_key(keys.anthropic_key) if keys.anthropic_key else None
         )
-    
+
     if "openrouter_key" in keys.model_fields_set:
         user_keys.openrouter_key = (
             encrypt_api_key(keys.openrouter_key) if keys.openrouter_key else None
@@ -2870,19 +2897,23 @@ async def get_user_api_keys_raw(
     """Get user's API keys in raw format (for internal use by LLM services)."""
     start_time = time.time()
     logging.info(f"[API-KEYS-RAW] Starting fetch for user {user_id}")
-    
+
     try:
         result = await session.execute(
             select(UserAPIKeys).where(UserAPIKeys.user_id == user_id)
         )
         query_time = time.time() - start_time
-        logging.info(f"[API-KEYS-RAW] Query completed in {query_time:.3f}s for user {user_id}")
-        
+        logging.info(
+            f"[API-KEYS-RAW] Query completed in {query_time:.3f}s for user {user_id}"
+        )
+
         user_keys = result.scalar_one_or_none()
 
         if not user_keys:
             total_time = time.time() - start_time
-            logging.info(f"[API-KEYS-RAW] No keys found. Total time: {total_time:.3f}s for user {user_id}")
+            logging.info(
+                f"[API-KEYS-RAW] No keys found. Total time: {total_time:.3f}s for user {user_id}"
+            )
             return {"openai_key": None, "anthropic_key": None, "openrouter_key": None}
 
         response = {
@@ -2900,11 +2931,15 @@ async def get_user_api_keys_raw(
                 else None
             ),
         }
-        
+
         total_time = time.time() - start_time
-        logging.info(f"[API-KEYS-RAW] Success. Total time: {total_time:.3f}s for user {user_id}")
+        logging.info(
+            f"[API-KEYS-RAW] Success. Total time: {total_time:.3f}s for user {user_id}"
+        )
         return response
     except Exception as e:
         error_time = time.time() - start_time
-        logging.error(f"[API-KEYS-RAW] Error after {error_time:.3f}s for user {user_id}: {str(e)}")
+        logging.error(
+            f"[API-KEYS-RAW] Error after {error_time:.3f}s for user {user_id}: {str(e)}"
+        )
         raise

@@ -1,7 +1,7 @@
-from typing_extensions import Annotated
-from langchain.tools import tool, ToolRuntime
+from langchain.tools import ToolRuntime, tool
 from langchain_core.messages import ToolMessage
 from langgraph.types import Command
+from typing_extensions import Annotated
 
 
 @tool

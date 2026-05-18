@@ -26,7 +26,7 @@ export function ThreadSidebar() {
   const [isCreating, setIsCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showArchived, setShowArchived] = useState(false);
-  
+
   // Bulk selection state
   const selectedThreadIds = useChatStore((state) => state.selectedThreadIds);
   const toggleThreadSelection = useChatStore((state) => state.toggleThreadSelection);
@@ -138,7 +138,7 @@ export function ThreadSidebar() {
             )}
           </button>
         </div>
-        
+
         <button
           onClick={handleCreateThread}
           disabled={isCreating}
@@ -159,7 +159,7 @@ export function ThreadSidebar() {
             />
             <span className="text-gray-700 dark:text-slate-300">Archived</span>
           </label>
-          
+
           <button
             onClick={() => {
               setShowBulkActions(!showBulkActions);
@@ -228,7 +228,7 @@ export function ThreadSidebar() {
                 </button>
               </div>
             )}
-            
+
             {threads.map((thread) => (
               <ThreadItem
                 key={thread.id}
@@ -308,8 +308,8 @@ function ThreadItem({ thread, isActive, isSelected, showCheckbox, onToggleSelect
       className={`group w-full px-2 py-2 transition-colors ${
         isArchived ? 'opacity-60' : ''
       } ${
-        isActive 
-          ? 'bg-slate-100 dark:bg-slate-700 border-l-4 border-slate-600 dark:border-slate-400' 
+        isActive
+          ? 'bg-slate-100 dark:bg-slate-700 border-l-4 border-slate-600 dark:border-slate-400'
           : isSelected
           ? 'bg-yellow-50 dark:bg-yellow-900/20 border-l-4 border-yellow-500 dark:border-yellow-400'
           : 'hover:bg-gray-50 dark:hover:bg-slate-700/50 border-l-4 border-transparent'
@@ -332,7 +332,7 @@ function ThreadItem({ thread, isActive, isSelected, showCheckbox, onToggleSelect
             )}
           </button>
         )}
-        
+
         <button onClick={onClick} className="flex items-center gap-3 flex-1 text-left min-w-0">
           <MessageCircle size={18} className="flex-shrink-0 text-gray-400 dark:text-slate-500" />
           {isEditing ? (
@@ -354,8 +354,8 @@ function ThreadItem({ thread, isActive, isSelected, showCheckbox, onToggleSelect
             />
           ) : (
             <div className="flex items-center gap-2 flex-1 min-w-0">
-              <AnimatedTitle 
-                title={thread.title || 'Untitled'} 
+              <AnimatedTitle
+                title={thread.title || 'Untitled'}
                 className="truncate text-sm font-medium"
                 duration={250}
               />
@@ -511,4 +511,3 @@ function DeleteConfirmModal({ onConfirm, onCancel, threadTitle }: DeleteConfirmM
     </div>
   );
 }
-

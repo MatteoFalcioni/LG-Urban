@@ -5,6 +5,7 @@ This test verifies that we can export files by executing export code
 directly inside the sandbox, rather than trying to read files from
 a separate Modal function.
 """
+
 import os
 import re
 import pytest
@@ -17,9 +18,9 @@ def clean_output(raw_text: str) -> str:
     """Strip ANSI escape codes and normalize line endings for CI/CD compatibility."""
     if not raw_text:
         return ""
-    ansi_escape = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
-    text = ansi_escape.sub('', raw_text)
-    return text.replace('\r\n', '\n').replace('\r', '\n').strip()
+    ansi_escape = re.compile(r"\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])")
+    text = ansi_escape.sub("", raw_text)
+    return text.replace("\r\n", "\n").replace("\r", "\n").strip()
 
 
 @pytest.mark.timeout(300)
@@ -34,7 +35,7 @@ def test_export_dataset_from_inside_sandbox():
 
     session_id = "test-export-session"
     executor = SandboxExecutor(session_id=session_id)
-    
+
     try:
         # Step 1: Create a test dataset file in the sandbox
         create_code = """
@@ -58,7 +59,7 @@ df.to_parquet(file_path)
 print(f"Created dataset at: {file_path}")
 print(f"File exists: {file_path.exists()}")
 """
-        
+
         result1 = executor.execute(create_code)
         print("Create result:", result1)
         stderr = clean_output(result1["stderr"])
@@ -66,15 +67,15 @@ print(f"File exists: {file_path.exists()}")
         assert stderr == "" or "FutureWarning" in stderr
         assert "Created dataset at:" in stdout
         assert "File exists: True" in stdout
-        
+
         # Step 2: Export the dataset from inside the sandbox
         # We'll test with and without S3 credentials
         have_s3 = bool(
-            os.getenv("AWS_ACCESS_KEY_ID") and 
-            os.getenv("AWS_SECRET_ACCESS_KEY") and 
-            os.getenv("S3_BUCKET")
+            os.getenv("AWS_ACCESS_KEY_ID")
+            and os.getenv("AWS_SECRET_ACCESS_KEY")
+            and os.getenv("S3_BUCKET")
         )
-        
+
         if have_s3:
             # Real S3 export
             bucket = os.environ["S3_BUCKET"]
@@ -95,7 +96,7 @@ else:
     sha256 = hashlib.sha256(data).hexdigest()
     mime = mimetypes.guess_type(file_path.name)[0] or "application/octet-stream"
     size = len(data)
-    
+
     # Upload to S3
     s3_key = f"output/datasets/{{sha256[:2]}}/{{sha256[2:4]}}/{{sha256}}"
     region = "eu-central-1"
@@ -106,7 +107,7 @@ else:
         Body=data,
         ContentType=mime
     )
-    
+
     result = {{
         "name": file_path.name,
         "path": str(file_path),
@@ -121,11 +122,11 @@ print(json.dumps(result))
 """
             result2 = executor.execute(export_code)
             print("Export result:", result2)
-            
+
             # Parse the JSON output
             output = result2["stdout"].strip()
             export_result = json.loads(output)
-            
+
             assert "error" not in export_result
             assert export_result["name"] == "test_export.parquet"
             assert "sha256" in export_result
@@ -133,7 +134,7 @@ print(json.dumps(result))
             assert "s3_url" in export_result
             assert export_result["s3_url"].startswith(f"s3://{bucket}/")
             print(f"✓ Successfully exported to S3: {export_result['s3_url']}")
-        
+
         else:
             # Mock S3 export - just verify file can be read and hashed
             export_code = """
@@ -151,7 +152,7 @@ else:
     sha256 = hashlib.sha256(data).hexdigest()
     mime = mimetypes.guess_type(file_path.name)[0] or "application/octet-stream"
     size = len(data)
-    
+
     result = {
         "name": file_path.name,
         "path": str(file_path),
@@ -165,17 +166,19 @@ print(json.dumps(result))
 """
             result2 = executor.execute(export_code)
             print("Mock export result:", result2)
-            
+
             # Parse the JSON output
             output = result2["stdout"].strip()
             export_result = json.loads(output)
-            
+
             assert "error" not in export_result
             assert export_result["name"] == "test_export.parquet"
             assert "sha256" in export_result
             assert export_result["mock"] is True
-            print(f"✓ Successfully read and hashed file (mock S3): {export_result['sha256']}")
-    
+            print(
+                f"✓ Successfully read and hashed file (mock S3): {export_result['sha256']}"
+            )
+
     finally:
         # Clean up
         executor.terminate()
@@ -188,18 +191,21 @@ async def test_export_dataset_tool_integration():
     # Require Modal tokens to run this real integration test
     if not (os.getenv("MODAL_TOKEN_ID") and os.getenv("MODAL_TOKEN_SECRET")):
         pytest.skip("Modal tokens not configured; skipping real Modal integration test")
-    
-    from backend.graph.tools.sandbox_tools import export_dataset_tool, get_or_create_executor, terminate_session_executor
+
+    from backend.graph.tools.sandbox_tools import (
+        export_dataset_tool,
+        get_or_create_executor,
+        terminate_session_executor,
+    )
     from backend.graph.context import set_thread_id
     from unittest.mock import Mock
-    import json
     import uuid
-    
+
     # Create a test session - use a proper UUID as thread_id
     thread_uuid = uuid.uuid4()
     set_thread_id(thread_uuid)
     session_id = str(thread_uuid)  # session_id matches thread_id
-    
+
     try:
         # Step 1: Create a dataset in the sandbox
         executor = get_or_create_executor(session_id)
@@ -217,33 +223,35 @@ print("Dataset created")
         result = executor.execute(create_code)
         assert "Dataset created" in clean_output(result["stdout"])
         print(f"✓ Dataset created in session {session_id}")
-        
+
         # Step 2: Use the export_dataset_tool
         mock_runtime = Mock()
         mock_runtime.tool_call_id = "test-call-123"
-        
+
         # Call the async tool via its coroutine
-        command = await export_dataset_tool.coroutine("datasets/tool_test.parquet", mock_runtime)
-        
+        command = await export_dataset_tool.coroutine(
+            "datasets/tool_test.parquet", mock_runtime
+        )
+
         # Extract the result
         tool_message = command.update["messages"][0]
-        
+
         # The export result is in the artifact field, not content
         # Content just has a success message
         assert "Dataset exported successfully" in tool_message.content
         assert tool_message.artifact is not None
         assert len(tool_message.artifact) > 0
-        
+
         export_result = tool_message.artifact[0]
         print(f"Export result: {export_result}")
-        
+
         # Verify success
         assert "error" not in export_result
         assert export_result["name"] == "tool_test.parquet"
         assert "sha256" in export_result
         assert "s3_url" in export_result
         print(f"✓ Tool successfully exported to: {export_result['s3_url']}")
-        
+
     finally:
         # Clean up
         terminate_session_executor(session_id)
@@ -252,4 +260,3 @@ print("Dataset created")
 if __name__ == "__main__":
     test_export_dataset_from_inside_sandbox()
     test_export_dataset_tool_integration()
-

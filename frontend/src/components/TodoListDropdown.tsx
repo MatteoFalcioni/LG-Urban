@@ -55,7 +55,7 @@ export function TodoListDropdown() {
       default: return <Circle size={14} className="text-yellow-500" />; // pending
     }
   };
-  
+
   const getStatusColor = (status: Todo['status']) => {
       switch (status) {
       case 'completed': return 'text-green-600 dark:text-green-400';
@@ -91,7 +91,7 @@ export function TodoListDropdown() {
       </button>
 
       {isExpanded && (
-        <div 
+        <div
           className="absolute top-full right-0 mt-1 w-96 rounded-lg shadow-lg border z-50 max-h-[80vh] overflow-y-auto"
           style={{ backgroundColor: 'var(--bg-primary)', borderColor: 'var(--border)' }}
         >
@@ -123,4 +123,3 @@ export function TodoListDropdown() {
     </div>
   );
 }
-

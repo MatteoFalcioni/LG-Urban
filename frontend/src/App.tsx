@@ -49,12 +49,12 @@ function App() {
             <Route path="/" element={<ChatPage />} />
             <Route path="/settings" element={<SettingsPage />} />
           </Routes>
-          
+
           {/* Toast notifications (global) */}
           <ToastManager toasts={toasts} onRemove={removeToast} />
         </BrowserRouter>
       </SignedIn>
-      
+
       <SignedOut>
         {/* User is signed out - redirect to sign in */}
         <RedirectToSignIn />
@@ -64,4 +64,3 @@ function App() {
 }
 
 export default App;
-

@@ -7,15 +7,16 @@ Architecture:
 """
 
 from __future__ import annotations
+
 import os
-from typing import Optional
 import uuid
+from typing import Optional
+
 import boto3
-
-from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
-from backend.db.models import Artifact
+from sqlalchemy.ext.asyncio import AsyncSession
 
+from backend.db.models import Artifact
 
 # (Blobstore helpers removed in S3-only workflow)
 

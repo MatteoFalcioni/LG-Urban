@@ -9,18 +9,20 @@ import { getThreadConfig, updateThreadConfig } from '@/utils/api';
 import { useChatStore } from '@/store/chatStore';
 
 const MODELS = [
-  { value: 'gpt-4.1', label: 'GPT-4.1' },
-  { value: 'claude-sonnet-4-5', label: 'Claude Sonnet 4.5' },
-  { value: 'claude-haiku-4-5', label: 'Claude Haiku 4.5' },
+  { value: 'gpt-5.5', label: 'GPT-5.5' },
+  { value: 'kimi-k2.6', label: 'Kimi k2.6' },
+  { value: 'minimax-m2.5', label: 'MiniMax M2.5' },
+  { value: 'claude-sonnet-4.6', label: 'Claude Sonnet 4.6' },
+  { value: 'claude-opus-4.6', label: 'Claude Opus 4.6' },
 ] as const;
 
 export function ModelSelector() {
   const currentThreadId = useChatStore((state) => state.currentThreadId);
   const defaultConfigModel = useChatStore((state) => state.defaultConfig.model);
   const defaultConfig = useChatStore((state) => state.defaultConfig);
-  
+
   const [isOpen, setIsOpen] = useState(false);
-  const [currentModel, setCurrentModel] = useState<string>('gpt-4.1');
+  const [currentModel, setCurrentModel] = useState<string>('claude-sonnet-4.6');
   const [isLoading, setIsLoading] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -28,7 +30,7 @@ export function ModelSelector() {
   const loadModel = useCallback(async () => {
     if (!currentThreadId) {
       // No thread: use default config
-      const model = defaultConfigModel || 'gpt-4.1';
+      const model = defaultConfigModel || 'claude-sonnet-4.6';
       console.log('ModelSelector: No thread, using defaultConfigModel:', model);
       setCurrentModel(model);
       return;
@@ -36,12 +38,12 @@ export function ModelSelector() {
 
     try {
       const config = await getThreadConfig(currentThreadId);
-      const model = config.model || defaultConfigModel || 'gpt-4.1';
+      const model = config.model || defaultConfigModel || 'claude-sonnet-4.6';
       console.log('ModelSelector: Loaded thread config, model:', model);
       setCurrentModel(model);
     } catch (err) {
       console.error('Failed to load thread config:', err);
-      const model = defaultConfigModel || 'gpt-4.1';
+      const model = defaultConfigModel || 'claude-sonnet-4.6';
       setCurrentModel(model);
     }
   }, [currentThreadId, defaultConfigModel]);
@@ -50,7 +52,7 @@ export function ModelSelector() {
   useEffect(() => {
     if (!currentThreadId) {
       // No thread: directly use defaultConfigModel (no API call needed)
-      const model = defaultConfigModel || 'gpt-4.1';
+      const model = defaultConfigModel || 'claude-sonnet-4.6';
       console.log('ModelSelector: No thread, using defaultConfigModel:', model);
       setCurrentModel(model);
     } else {
@@ -65,7 +67,7 @@ export function ModelSelector() {
       loadModel();
     } else if (isOpen && !currentThreadId) {
       // No thread: just update from defaultConfigModel
-      const model = defaultConfigModel || 'gpt-4.1';
+      const model = defaultConfigModel || 'claude-sonnet-4.6';
       setCurrentModel(model);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -74,7 +76,7 @@ export function ModelSelector() {
   // Reload model when page becomes visible (e.g., returning from settings) - only if thread exists
   useEffect(() => {
     if (!currentThreadId) return; // Skip if no thread
-    
+
     function handleVisibilityChange() {
       if (document.visibilityState === 'visible') {
         loadModel();
@@ -89,7 +91,7 @@ export function ModelSelector() {
   // Reload model when window gains focus (e.g., switching tabs back) - only if thread exists
   useEffect(() => {
     if (!currentThreadId) return; // Skip if no thread
-    
+
     function handleFocus() {
       loadModel();
     }
@@ -159,8 +161,8 @@ export function ModelSelector() {
         }}
       >
         <span>{currentModelLabel}</span>
-        <ChevronUp 
-          size={12} 
+        <ChevronUp
+          size={12}
           className={`transition-transform duration-200 ${isOpen ? '' : 'rotate-180'}`}
         />
       </button>
@@ -195,4 +197,3 @@ export function ModelSelector() {
     </div>
   );
 }
-

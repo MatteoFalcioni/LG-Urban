@@ -1,54 +1,51 @@
-from langgraph.types import Command
-from typing_extensions import Literal
-from langchain.agents import create_agent
-from langgraph.graph import StateGraph, START
-from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
-from langchain_text_splitters import TokenTextSplitter
-from langchain.agents.middleware import SummarizationMiddleware, TodoListMiddleware
-from langchain_core.messages import HumanMessage
-from pydantic import SecretStr
-from dotenv import load_dotenv
 import os
 from datetime import datetime
 from pathlib import Path
 
-from backend.graph.utils import get_openrouter_model
+from dotenv import load_dotenv
+from langchain.agents import create_agent
+from langchain.agents.middleware import SummarizationMiddleware, TodoListMiddleware
+from langchain_core.messages import HumanMessage
+from langchain_text_splitters import TokenTextSplitter
+from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
+from langgraph.graph import START, StateGraph
+from langgraph.types import Command
+from pydantic import SecretStr
+from typing_extensions import Literal
 
-from backend.graph.prompts.summarizer import summarizer_prompt
 from backend.graph.prompts.analyst import PROMPT
 from backend.graph.prompts.report import report_prompt
 from backend.graph.prompts.reviewer import reviewer_prompt
+from backend.graph.prompts.summarizer import summarizer_prompt
 from backend.graph.prompts.supervisor import supervisor_prompt
 from backend.graph.prompts.todo import TODOS_TOOL_DESCRIPTION, WRITE_TODOS_SYSTEM_PROMPT
-
 from backend.graph.state import MyState
-
+from backend.graph.tools.api_tools import (
+    get_dataset_description_tool,
+    get_dataset_fields_tool,
+    get_dataset_time_info_tool,
+    is_geo_dataset_tool,
+    list_catalog_tool,
+    preview_dataset_tool,
+)
 from backend.graph.tools.report_tools import (
     write_report_tool,
     write_source_tool,
 )
 from backend.graph.tools.review_tools import (
     approve_analysis_tool,
+    read_analysis_objectives_tool,
+    read_code_logs_tool,
+    read_sources_tool,
     reject_analysis_tool,
     update_completeness_score,
     update_relevancy_score,
-    read_code_logs_tool,
-    read_sources_tool,
-    read_analysis_objectives_tool,
 )
 from backend.graph.tools.sandbox_tools import (
     execute_code_tool,
+    export_dataset_tool,
     list_loaded_datasets_tool,
     load_dataset_tool,
-    export_dataset_tool,
-)
-from backend.graph.tools.api_tools import (
-    list_catalog_tool,
-    preview_dataset_tool,
-    get_dataset_description_tool,
-    get_dataset_fields_tool,
-    is_geo_dataset_tool,
-    get_dataset_time_info_tool,
 )
 from backend.graph.tools.supervisor_tools import (
     assign_to_analyst,
@@ -56,6 +53,7 @@ from backend.graph.tools.supervisor_tools import (
     assign_to_reviewer,
 )
 from backend.graph.tools.web_tools import internet_search
+from backend.graph.utils import get_openrouter_model
 
 load_dotenv()
 
@@ -96,7 +94,7 @@ def make_graph(
     Create a graph with custom config. Reuses the same checkpointer for all invocations.
 
     Args:
-        model_name: Model name (e.g., "gpt-4.1", "claude-sonnet-4-5"). 
+        model_name: Model name (e.g., "gpt-4.1", "claude-sonnet-4-5").
                     Automatically converted to OpenRouter format (openai/gpt-4.1, anthropic/claude-sonnet-4-5).
         temperature: Model temperature (0.0-2.0). If None, uses env DEFAULT_TEMPERATURE or model default.
         system_prompt: Custom system prompt. If None, uses default PROMPT.
@@ -117,44 +115,48 @@ def make_graph(
     # ======= SUPERVISOR =======
     # use gpt-4.1 for supervisor (via OpenRouter)
     supervisor_llm = get_openrouter_model(
-        model_name="openai/gpt-4.1",  
-        api_key=openrouter_api_key
-    ) 
+        model_name="openai/gpt-4.1", api_key=openrouter_api_key
+    )
 
     supervisor_agent = create_agent(
         model=supervisor_llm,
         tools=[assign_to_analyst, assign_to_report_writer, assign_to_reviewer],
         system_prompt=supervisor_prompt,
         name="agent_supervisor",
-        state_schema=MyState, 
+        state_schema=MyState,
     )
 
     # ======= ANALYST AGENT =======
-    from backend.config import DEFAULT_MODEL, DEFAULT_TEMPERATURE, CONTEXT_WINDOW
-    model_name = model_name or DEFAULT_MODEL 
-    temp = temperature if temperature is not None else DEFAULT_TEMPERATURE 
+    from backend.config import CONTEXT_WINDOW, DEFAULT_MODEL, DEFAULT_TEMPERATURE
+
+    model_name = model_name or DEFAULT_MODEL
+    temp = temperature if temperature is not None else DEFAULT_TEMPERATURE
     context_window = context_window if context_window is not None else CONTEXT_WINDOW
     effective_context_window = int(context_window * 0.9)  # (90% for safety)
     print(
         f"[MODEL] Using model: {model_name} (temperature: {temp if temp is not None else DEFAULT_TEMPERATURE}), context window: {context_window if context_window is not None else CONTEXT_WINDOW}"
     )
-    
+
     # Convert model name to OpenRouter format if needed
     # OpenRouter expects format: "provider/model-name"
     if model_name.startswith("gpt-"):
         openrouter_model_name = f"openai/{model_name}"
     elif model_name.startswith("claude-"):
         openrouter_model_name = f"anthropic/{model_name}"
+    elif model_name.startswith("kimi-"):
+        openrouter_model_name = f"moonshot/{model_name}"
+    elif model_name.startswith("minimax-"):
+        openrouter_model_name = f"minimax/{model_name}"
     else:
         # Assume it's already in OpenRouter format or a valid model name
         openrouter_model_name = model_name
-    
+
     # Create analyst LLM via OpenRouter
     llm = get_openrouter_model(
         model_name=openrouter_model_name,
         temperature=temp,
         api_key=openrouter_api_key,
-        stream_usage=True  # to get usr metadata with astream_events (crucial for token count)
+        stream_usage=True,  # to get usr metadata with astream_events (crucial for token count)
     )
 
     # Use default prompt, + custom prompt as string (LangChain v1.0 expects string, not SystemMessage)
@@ -191,8 +193,7 @@ def make_graph(
 
     # Summarizer for middleware (via OpenRouter)
     summarizer = get_openrouter_model(
-        model_name="openai/gpt-4.1",
-        api_key=openrouter_api_key
+        model_name="openai/gpt-4.1", api_key=openrouter_api_key
     )
 
     analyst_agent = create_agent(
@@ -218,8 +219,7 @@ def make_graph(
     # ======= REPORT WRITER AGENT =======
     # use gpt 4.1 for report writer (via OpenRouter)
     report_writer_llm = get_openrouter_model(
-        model_name="openai/gpt-4.1",
-        api_key=openrouter_api_key
+        model_name="openai/gpt-4.1", api_key=openrouter_api_key
     )
 
     agent_report_writer = create_agent(
@@ -241,8 +241,7 @@ def make_graph(
     # ======= REVIEWER AGENT =======
     # use gpt-4.1 for reviewer (via OpenRouter)
     reviewer_llm = get_openrouter_model(
-        model_name="openai/gpt-4.1",
-        api_key=openrouter_api_key
+        model_name="openai/gpt-4.1", api_key=openrouter_api_key
     )
     agent_reviewer = create_agent(
         model=reviewer_llm,
@@ -314,7 +313,7 @@ def make_graph(
         code_tokens = reviewer_llm.get_num_tokens(code_logs_str)
         if code_tokens > 5000:
             # here we split the code logs into big chunks of 5000 tokens each, with big overlap for more context;
-            mdl_name = reviewer_llm.model_name.split('/')[-1]
+            mdl_name = reviewer_llm.model_name.split("/")[-1]
             splitter = TokenTextSplitter(
                 model_name=mdl_name,  # now using gpt4.1; otherwise, cl100k_base is more model agnostic, and it's the same that get_num_tokens uses for claude models
                 chunk_size=5000,
@@ -340,8 +339,8 @@ def make_graph(
         return Command(
             update={
                 "messages": msg_update,
-                # NOTE: not resetting code logs to [] here, 'cause the supervisor does it at assignment to data analyst 
-                "code_logs" : code_logs,
+                # NOTE: not resetting code logs to [] here, 'cause the supervisor does it at assignment to data analyst
+                "code_logs": code_logs,
                 "code_logs_chunks": code_logs_chunks,
                 "sources": sources,  # updated by analyst
                 "analysis_comments": "",  # reset analysis comments (if there were any, we used them)
@@ -454,7 +453,7 @@ def make_graph(
     # ======= GRAPH  BUILDING =======
 
     builder = StateGraph(MyState)
-        
+
     builder.add_node(
         "supervisor", supervisor_agent
     )  # , destinations=("data_analyst", "report_writer", "reviewer", END)

@@ -21,7 +21,7 @@ export function ScoreBar({ score, status }: ScoreBarProps) {
   // Determine color based on score thresholds
   let colorClasses = '';
   let bgColorClasses = '';
-  
+
   if (clampedScore > 0.7) {
     // Green for high scores
     colorClasses = 'bg-green-500 dark:bg-green-500';

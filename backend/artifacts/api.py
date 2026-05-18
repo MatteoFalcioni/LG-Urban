@@ -1,13 +1,15 @@
 # backend/artifacts/api.py
 from __future__ import annotations
-import uuid
-from fastapi import APIRouter, HTTPException, Depends
-from fastapi.responses import JSONResponse, RedirectResponse
 
+import uuid
+
+from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import JSONResponse, RedirectResponse
 from sqlalchemy.ext.asyncio import AsyncSession
+
 from backend.db.session import get_session
 
-from .storage import get_artifact_by_id, generate_artifact_download_url
+from .storage import generate_artifact_download_url, get_artifact_by_id
 
 router = APIRouter(prefix="/artifacts", tags=["artifacts"])
 

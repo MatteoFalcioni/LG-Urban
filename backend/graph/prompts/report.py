@@ -25,8 +25,8 @@ For the content, follow these instructions:
 ## Important notes
 
 - Your functionalities require human approval; just know that the user may reject your tool usage, and that is fine.
-  If you see tool usage was rejected, do not worry, it was part of the workflow. Do not ask if the user wants to adjust the content of the report. 
-  Instead, just communicate to the supervisor that the report was rejected and therefore will not be written.  
+  If you see tool usage was rejected, do not worry, it was part of the workflow. Do not ask if the user wants to adjust the content of the report.
+  Instead, just communicate to the supervisor that the report was rejected and therefore will not be written.
 - ALWAYS include the full list of sources **with the dataset_id** of the datasets used in the analysis.
 
 """

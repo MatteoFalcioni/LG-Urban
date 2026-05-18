@@ -1,13 +1,14 @@
-import modal
 import json
 import threading
 import time
 import uuid
-from typing import Dict, Any
+from typing import Any, Dict
+
+import modal
 
 # Import the Modal app and image from app.py
 from .app import image
-from .session import volume_name, session_base_dir
+from .session import session_base_dir, volume_name
 
 # FIX: Create volume at module level to avoid race conditions
 _volume = modal.Volume.from_name(volume_name(), create_if_missing=True)
@@ -16,43 +17,43 @@ _volume = modal.Volume.from_name(volume_name(), create_if_missing=True)
 class SandboxExecutor:
     """
     Manages per-session Modal Sandboxes with persistent state.
-    
+
     Args:
         session_id (str): The ID of the session.
         env (dict[str, str]): The environment variables to pass to the sandbox.
     """
 
     def __init__(self, session_id: str, env: dict[str, str] | None = None):
-
         self.session_id = session_id
         self.env = env or {}
         # Ensure unbuffered I/O inside sandbox (critical for CI/CD environments)
         self.env.setdefault("PYTHONUNBUFFERED", "1")
-        
+
         print(f"[EXECUTOR] Initializing for session {session_id}")
-        
+
         # Use module-level volume to avoid race conditions
         print("[EXECUTOR] Using module-level volume...")
         self.volume = _volume
         base_dir = session_base_dir(session_id)
-        
+
         # Only load AWS secrets if S3 upload is not disabled
         secrets = []
         if self.env.get("S3_DISABLE_UPLOAD") != "1":
             secrets.append(modal.Secret.from_name("aws-credentials-IAM"))
             secrets.append(modal.Secret.from_name("modal-token-id"))
             secrets.append(modal.Secret.from_name("modal-token-secret"))
-        
+
         # Important: fixed sandbox creation by hydrating the Modal App inline (required outside Modal containers).
         print("[EXECUTOR] Looking up app...")
         hydrated_app = modal.App.lookup("urbia", create_if_missing=True)
-        
+
         print(f"[EXECUTOR] Creating sandbox (image: {image})...")
         self.sandbox = modal.Sandbox.create(
             app=hydrated_app,
             image=image,
             timeout=60 * 60 * 2,  # 2 hours session timeout
-            idle_timeout=60 * 10,  # 10 min idle timeout
+            idle_timeout=60
+            * 20,  # 20 min idle timeout (increased for long LLM reasoning)
             volumes={"/workspace": self.volume},  # link it to above volume
             workdir=base_dir,  # NEW: per session cwd
             secrets=secrets,  # AWS creds for S3 uploads (optional)
@@ -74,7 +75,7 @@ class SandboxExecutor:
             env=self.env,  # Pass custom env vars to driver process
         )
         print("[EXECUTOR] Driver started.")
-        
+
         # CRITICAL: Create stdout iterator ONCE and reuse it for all reads
         # Creating a new iterator on each execute() call breaks the state
         self.stdout_reader = iter(self.process.stdout)
@@ -117,35 +118,45 @@ class SandboxExecutor:
             with self._execute_lock:
                 # Write in chunks to avoid buffer overflow for large datasets
                 chunk_size = 8192  # 8KB chunks - safe size for Modal's buffer
-                print(f"[EXECUTOR] Writing {len(command_with_newline)} bytes to stdin...")
+                print(
+                    f"[EXECUTOR] Writing {len(command_with_newline)} bytes to stdin..."
+                )
                 for i in range(0, len(command_with_newline), chunk_size):
                     chunk = command_with_newline[i : i + chunk_size]
                     self.process.stdin.write(chunk)
                     self.process.stdin.drain()  # Flush after each chunk to prevent buffer overflow
 
                 print("[EXECUTOR] Waiting for response from stdout...")
-                
+
                 # FIX: Add retry loop with debug logging for empty responses
                 max_retries = 10
                 result_line = None
                 for attempt in range(max_retries):
                     result_line = next(self.stdout_reader, None)
-                    
+
                     # Debug: log what we received
                     if result_line is None:
-                        print(f"[EXECUTOR] Attempt {attempt + 1}/{max_retries}: Got None from stdout")
+                        print(
+                            f"[EXECUTOR] Attempt {attempt + 1}/{max_retries}: Got None from stdout"
+                        )
                     elif not result_line.strip():
-                        print(f"[EXECUTOR] Attempt {attempt + 1}/{max_retries}: Got empty string from stdout")
+                        print(
+                            f"[EXECUTOR] Attempt {attempt + 1}/{max_retries}: Got empty string from stdout"
+                        )
                     else:
-                        print(f"[EXECUTOR] Attempt {attempt + 1}/{max_retries}: Got response ({len(result_line)} bytes)")
+                        print(
+                            f"[EXECUTOR] Attempt {attempt + 1}/{max_retries}: Got response ({len(result_line)} bytes)"
+                        )
                         break  # Got valid response
-                    
+
                     # Check if process died
                     poll_result = self.process.poll()
                     if poll_result is not None:
-                        print(f"[EXECUTOR] Process died with code {poll_result} during read")
+                        print(
+                            f"[EXECUTOR] Process died with code {poll_result} during read"
+                        )
                         break
-                    
+
                     # Wait before retry with exponential backoff
                     time.sleep(0.1 * (attempt + 1))
                 else:
@@ -154,7 +165,9 @@ class SandboxExecutor:
                     # Try one more time to get any available data
                     try:
                         remaining = next(self.stdout_reader, None)
-                        print(f"[EXECUTOR] Final read attempt: {repr(remaining)[:100] if remaining else 'None'}")
+                        print(
+                            f"[EXECUTOR] Final read attempt: {repr(remaining)[:100] if remaining else 'None'}"
+                        )
                         if remaining and remaining.strip():
                             result_line = remaining
                     except Exception as e:
@@ -173,17 +186,21 @@ class SandboxExecutor:
                             break
                 except Exception:
                     pass
-                
-                stderr_output = "".join(stderr_lines) if stderr_lines else "No stderr output captured"
+
+                stderr_output = (
+                    "".join(stderr_lines)
+                    if stderr_lines
+                    else "No stderr output captured"
+                )
                 print(f"[EXECUTOR] Stderr captured: {stderr_output}")
-                
+
                 # Check if process is still running
                 try:
                     returncode = self.process.returncode
                     process_status = f"Process returncode: {returncode}"
                 except Exception:
                     process_status = "Process status unknown"
-                
+
                 return {
                     "stdout": "",
                     "stderr": f"Driver process terminated unexpectedly.\n{process_status}\nDriver stderr:\n{stderr_output}",
@@ -191,7 +208,9 @@ class SandboxExecutor:
                 }
 
             # DEBUG: Log what we're about to parse
-            print(f"[EXECUTOR] About to parse JSON from: {repr(result_line.strip()[:200])}")
+            print(
+                f"[EXECUTOR] About to parse JSON from: {repr(result_line.strip()[:200])}"
+            )
             result = json.loads(result_line.strip())
             received_id = result.get("request_id")
             print(f"[EXECUTOR] Successfully parsed JSON, request_id: {received_id}")
@@ -212,7 +231,9 @@ class SandboxExecutor:
                     except json.JSONDecodeError:
                         continue
                     if extra.get("request_id") == request_id:
-                        print(f"[EXECUTOR] Found matching response after draining {_drain + 1} line(s).")
+                        print(
+                            f"[EXECUTOR] Found matching response after draining {_drain + 1} line(s)."
+                        )
                         result = extra
                         break
                 else:
@@ -238,7 +259,9 @@ class SandboxExecutor:
         except json.JSONDecodeError as e:
             # DEBUG: Log the raw response that failed to parse
             print(f"[EXECUTOR] JSONDecodeError: {e}")
-            print(f"[EXECUTOR] Failed to parse: {repr(result_line) if result_line else 'None'}")
+            print(
+                f"[EXECUTOR] Failed to parse: {repr(result_line) if result_line else 'None'}"
+            )
             return {
                 "stdout": "",
                 "stderr": f"Invalid JSON response from driver: {e}. Raw response: {repr(result_line) if result_line else 'None'}",

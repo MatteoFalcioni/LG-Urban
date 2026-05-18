@@ -39,7 +39,12 @@ def check_modal_tokens():
 
 def check_s3_bucket():
     """Check that S3 bucket is configured."""
-    if not os.getenv("S3_BUCKET") or not os.getenv("AWS_ACCESS_KEY_ID") or not os.getenv("AWS_SECRET_ACCESS_KEY") or not os.getenv("AWS_REGION"):
+    if (
+        not os.getenv("S3_BUCKET")
+        or not os.getenv("AWS_ACCESS_KEY_ID")
+        or not os.getenv("AWS_SECRET_ACCESS_KEY")
+        or not os.getenv("AWS_REGION")
+    ):
         raise ValueError("S3 bucket not configured")
 
 
@@ -49,32 +54,32 @@ def get_s3_client():
     return boto3.client(
         "s3",
         region_name=region,
-        config=Config(
-            signature_version='s3v4',
-            connect_timeout=10,
-            read_timeout=30
-        )
+        config=Config(signature_version="s3v4", connect_timeout=10, read_timeout=30),
     )
 
 
 def create_tiny_test_dataframe(seed: int = 0) -> pd.DataFrame:
     """Create a tiny test DataFrame (~1-2KB when saved as parquet)."""
-    return pd.DataFrame({
-        "id": range(10),
-        "city": [f"city_{i}" for i in range(10)],
-        "value": [i * 1.5 + seed for i in range(10)],
-        "category": ["A", "B", "C", "A", "B", "C", "A", "B", "C", "A"]
-    })
+    return pd.DataFrame(
+        {
+            "id": range(10),
+            "city": [f"city_{i}" for i in range(10)],
+            "value": [i * 1.5 + seed for i in range(10)],
+            "category": ["A", "B", "C", "A", "B", "C", "A", "B", "C", "A"],
+        }
+    )
 
 
-def get_or_create_test_dataset(s3_client, bucket: str, dataset_name: str, seed: int = 0) -> bytes:
+def get_or_create_test_dataset(
+    s3_client, bucket: str, dataset_name: str, seed: int = 0
+) -> bytes:
     """
     Get test dataset from S3 tests/ prefix, or create and upload if it doesn't exist.
-    
+
     Returns the parquet bytes (small ~2KB payload).
     """
     s3_key = f"tests/{dataset_name}.parquet"
-    
+
     try:
         # Try to get existing
         response = s3_client.get_object(Bucket=bucket, Key=s3_key)
@@ -82,30 +87,34 @@ def get_or_create_test_dataset(s3_client, bucket: str, dataset_name: str, seed: 
         print(f"📥 Found existing test dataset: {s3_key} ({len(data_bytes)} bytes)")
         return data_bytes
     except ClientError as e:
-        if e.response['Error']['Code'] == 'NoSuchKey':
+        if e.response["Error"]["Code"] == "NoSuchKey":
             # Create tiny dataset (~1-2KB)
             df = create_tiny_test_dataframe(seed=seed)
             buffer = io.BytesIO()
             df.to_parquet(buffer)
             data_bytes = buffer.getvalue()
-            
+
             # Upload to S3 tests/ prefix
             s3_client.put_object(
-                Bucket=bucket, 
-                Key=s3_key, 
+                Bucket=bucket,
+                Key=s3_key,
                 Body=data_bytes,
-                ContentType="application/octet-stream"
+                ContentType="application/octet-stream",
             )
-            print(f"✅ Created and uploaded test dataset: {s3_key} ({len(data_bytes)} bytes)")
+            print(
+                f"✅ Created and uploaded test dataset: {s3_key} ({len(data_bytes)} bytes)"
+            )
             return data_bytes
         else:
             raise
 
 
-def load_dataset_bytes_to_sandbox(executor: SandboxExecutor, dataset_id: str, data_bytes: bytes) -> dict:
+def load_dataset_bytes_to_sandbox(
+    executor: SandboxExecutor, dataset_id: str, data_bytes: bytes
+) -> dict:
     """Load dataset bytes into sandbox (replicates load_dataset_tool logic)."""
     data_b64 = base64.b64encode(data_bytes).decode("utf-8")
-    
+
     write_code = f"""
 import base64
 import json
@@ -138,10 +147,10 @@ print(json.dumps(result))
     result = executor.execute(write_code)
     stdout = result.get("stdout", "").strip()
     stderr = result.get("stderr", "")
-    
+
     if stderr:
         raise RuntimeError(f"Failed to write dataset: {stderr}")
-    
+
     return json.loads(stdout)
 
 
@@ -163,11 +172,12 @@ print(json.dumps(files))
     stdout = result.get("stdout", "").strip()
     return json.loads(stdout) if stdout else []
 
+
 # --- fixtures ---
 @pytest.fixture(scope="function")
 def test_session_id():
     """Create a unique test session ID for each test function.
-    
+
     Using function scope because the executor/driver becomes unresponsive
     after being used in CI environments. Each test gets a fresh session.
     """
@@ -175,7 +185,11 @@ def test_session_id():
     yield session_id
     # Cleanup: terminate executor if created
     print(f"\n🧹 Cleaning up test session: {session_id}")
-    from backend.graph.tools.sandbox_tools import terminate_session_executor, _executor_cache
+    from backend.graph.tools.sandbox_tools import (
+        terminate_session_executor,
+        _executor_cache,
+    )
+
     terminate_session_executor(session_id)
     _executor_cache.pop(session_id, None)
 
@@ -183,7 +197,7 @@ def test_session_id():
 @pytest.fixture(scope="function")
 def test_executor(test_session_id):
     """Create a fresh executor for each test function.
-    
+
     Using function scope because the executor/driver becomes unresponsive
     after being used once in CI environments (GitHub Actions).
     This is slower but more reliable.
@@ -192,6 +206,7 @@ def test_executor(test_session_id):
     executor = SandboxExecutor(session_id=test_session_id)
     yield executor
     executor.terminate()
+
 
 # --- actual tests ---
 @pytest.mark.asyncio
@@ -203,19 +218,19 @@ async def test_load_dataset_from_api(test_executor, test_session_id):
     print(f"Session: {session_id}")
 
     dataset_id = "temperature_bologna"
-    
+
     # Download from API
     print(f"Starting download of dataset: {dataset_id}")
     data_bytes = await get_dataset_bytes(client=client, dataset_id=dataset_id)
     print(f"Download completed. Size: {len(data_bytes)} bytes")
-    
+
     # Load into sandbox using helper function (same logic as tool)
     res = load_dataset_bytes_to_sandbox(executor, dataset_id, data_bytes)
-    
+
     assert res["dataset_id"] == dataset_id
     assert res["rel_path"].endswith(f"datasets/{dataset_id}.parquet")
     print(f"Loaded dataset from API successfully: {res}")
-    
+
     # Verify we can access the dataset in code
     code = f"""
 import pandas as pd
@@ -226,19 +241,20 @@ print(f"First few rows:")
 print(df.head())
 """
     result = executor.execute(code)
-    
+
     assert "stdout" in result
     stdout = clean_output(result["stdout"])
     assert "shape" in stdout.lower() or "loaded dataset" in stdout.lower()
     assert not result.get("stderr") or clean_output(result["stderr"]) == ""
-    
+
     print("✅ Loaded dataset from API and accessed from sandbox successfully")
+
 
 @pytest.mark.asyncio
 @pytest.mark.timeout(300)
 async def test_load_dataset_from_s3(test_executor, test_session_id):
     """Test that we can load a dataset from S3 into the sandbox.
-    
+
     Uses a tiny test dataset (~2KB) from s3://{bucket}/tests/ to avoid
     buffer overflow issues with large payloads in CI environments.
     """
@@ -247,10 +263,10 @@ async def test_load_dataset_from_s3(test_executor, test_session_id):
     executor = test_executor
     session_id = test_session_id
     print(f"Session: {session_id}")
-    
+
     # Use tiny test dataset instead of real Bologna dataset
     dataset_id = "tiny_test_s3"
-    
+
     # Get or create the test dataset in S3
     s3 = get_s3_client()
     bucket = os.getenv("S3_BUCKET")
@@ -259,7 +275,7 @@ async def test_load_dataset_from_s3(test_executor, test_session_id):
 
     # Load into sandbox using helper function (same logic as tool)
     res = load_dataset_bytes_to_sandbox(executor, dataset_id, data_bytes)
-    
+
     assert res["dataset_id"] == dataset_id
     assert res["rel_path"].endswith(f"datasets/{dataset_id}.parquet")
     print(f"Loaded dataset from S3 successfully: {res}")
@@ -273,23 +289,24 @@ print(f"Columns: {{list(df.columns)}}")
 print(f"Memory usage: {{df.memory_usage(deep=True).sum() / 1024:.2f}} KB")
 """
     result = executor.execute(code)
-    
+
     stdout = clean_output(result["stdout"])
     assert "Dataset shape" in stdout
     assert "(10," in stdout  # Our tiny dataset has 10 rows
     assert not result.get("stderr") or clean_output(result["stderr"]) == ""
     print("✅ Loaded dataset from S3 and accessed from sandbox successfully")
 
+
 @pytest.mark.asyncio
 @pytest.mark.timeout(300)
 async def test_load_multiple_datasets_in_same_session(test_executor, test_session_id):
     """Test that we can load multiple datasets into the sandbox in the same session.
-    
+
     Uses tiny test datasets (~2KB each) from s3://{bucket}/tests/ to avoid
     buffer overflow issues with large payloads in CI environments.
     """
     check_s3_bucket()
-    
+
     executor = test_executor
     session_id = test_session_id
     print(f"Session: {session_id}")
@@ -303,7 +320,7 @@ async def test_load_multiple_datasets_in_same_session(test_executor, test_sessio
     print(f"Loading dataset 1: {dataset_id1}")
     bytes1 = get_or_create_test_dataset(s3, bucket, dataset_id1, seed=100)
     res1 = load_dataset_bytes_to_sandbox(executor, dataset_id1, bytes1)
-    
+
     assert res1["dataset_id"] == dataset_id1
     assert res1["rel_path"].endswith(f"datasets/{dataset_id1}.parquet")
     print(f"✅ Dataset 1 loaded: {res1}")
@@ -313,7 +330,7 @@ async def test_load_multiple_datasets_in_same_session(test_executor, test_sessio
     print(f"Loading dataset 2: {dataset_id2}")
     bytes2 = get_or_create_test_dataset(s3, bucket, dataset_id2, seed=200)
     res2 = load_dataset_bytes_to_sandbox(executor, dataset_id2, bytes2)
-    
+
     assert res2["dataset_id"] == dataset_id2
     assert res2["rel_path"].endswith(f"datasets/{dataset_id2}.parquet")
     print(f"✅ Dataset 2 loaded: {res2}")

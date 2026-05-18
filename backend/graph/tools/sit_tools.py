@@ -1,18 +1,18 @@
-import folium
-import tempfile
 import hashlib
 import os
+import tempfile
+from pathlib import Path
+from typing import List, Optional
+
 import boto3
+import folium
 from botocore.client import Config
-from typing import Optional, List
-from typing_extensions import Annotated
-from langgraph.types import Command
+from folium import Element
+from folium.plugins import DualMap
 from langchain.tools import ToolRuntime, tool
 from langchain_core.messages import ToolMessage
-from pathlib import Path
-from folium.plugins import DualMap
-from folium import Element
-
+from langgraph.types import Command
+from typing_extensions import Annotated
 
 # --------------------------
 # Google Geocoding Tool (lazy loaded)
@@ -81,7 +81,6 @@ async def folium_ortho(
         Annotated[str, "query to get the ortofoto of a specific location"]
     ] = None,
 ) -> Command:
-
     bbox = None
     # if the agent queried a location, build bbox taking the location as the center
     if query:
@@ -399,7 +398,6 @@ async def compare_ortofoto(
 
         artifact_struct = None
         if descriptors:  # means it was ingested correctly
-
             message = f"Dual ortofoto: {left_year} (left) vs {right_year} (right) generated and shown successfully"
             if note:
                 message += f" {note}"
@@ -426,7 +424,6 @@ async def compare_ortofoto(
                 }
             )
         else:  # means it was not ingested correctly
-
             message = f"Failed to ingest and show ortofoto {left_year} (left) vs {right_year} (right) map"
             if note:
                 message += f" {note}"
@@ -488,8 +485,8 @@ def _create_bologna_3d_html() -> str:
 </head>
 <body>
     <div class="viewer-container">
-        <iframe 
-            src="https://sitmappe.comune.bologna.it/Bologna3D/" 
+        <iframe
+            src="https://sitmappe.comune.bologna.it/Bologna3D/"
             allowfullscreen
             title="Bologna 3D Model">
         </iframe>

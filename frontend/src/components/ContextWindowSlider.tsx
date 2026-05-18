@@ -1,6 +1,6 @@
 /**
  * ContextWindowSlider: Slider component for adjusting context window size.
- * Shows in the message input bubble with warning when > 64k.
+ * Shows in the message input bubble with warning when > 200k.
  */
 
 import { useState, useEffect, useRef, useCallback } from 'react';
@@ -8,7 +8,7 @@ import { getThreadConfig, updateThreadConfig } from '@/utils/api';
 import { useChatStore } from '@/store/chatStore';
 
 const MIN_CONTEXT = 16000;
-const MAX_CONTEXT = 128000;
+const MAX_CONTEXT = 1000000;  // 1M tokens
 const STEP = 2000;
 
 // Generate array of valid values (multiples of 2000)
@@ -21,9 +21,9 @@ export function ContextWindowSlider() {
   const currentThreadId = useChatStore((state) => state.currentThreadId);
   const defaultConfig = useChatStore((state) => state.defaultConfig);
   const setDefaultConfig = useChatStore((state) => state.setDefaultConfig);
-  
-  const [contextWindow, setContextWindow] = useState<number>(64000);
-  const [localValue, setLocalValue] = useState<number>(64000); // For smooth visual feedback during drag
+
+  const [contextWindow, setContextWindow] = useState<number>(200000);
+  const [localValue, setLocalValue] = useState<number>(200000); // For smooth visual feedback during drag
   const [isLoading, setIsLoading] = useState(false);
   const sliderRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -33,9 +33,9 @@ export function ContextWindowSlider() {
   const loadContextWindow = useCallback(async () => {
     if (!currentThreadId) {
       // No thread: use default config
-      const ctx = defaultConfig.context_window ?? 64000;
+      const ctx = defaultConfig.context_window ?? 200000;
       // Round to nearest valid value
-      const rounded = CONTEXT_VALUES.reduce((prev, curr) => 
+      const rounded = CONTEXT_VALUES.reduce((prev, curr) =>
         Math.abs(curr - ctx) < Math.abs(prev - ctx) ? curr : prev
       );
       setContextWindow(rounded);
@@ -45,17 +45,17 @@ export function ContextWindowSlider() {
 
     try {
       const config = await getThreadConfig(currentThreadId);
-      const ctx = config.context_window ?? defaultConfig.context_window ?? 64000;
+      const ctx = config.context_window ?? defaultConfig.context_window ?? 200000;
       // Round to nearest valid value
-      const rounded = CONTEXT_VALUES.reduce((prev, curr) => 
+      const rounded = CONTEXT_VALUES.reduce((prev, curr) =>
         Math.abs(curr - ctx) < Math.abs(prev - ctx) ? curr : prev
       );
       setContextWindow(rounded);
       setLocalValue(rounded);
     } catch (err) {
       console.error('Failed to load thread config:', err);
-      const ctx = defaultConfig.context_window ?? 64000;
-      const rounded = CONTEXT_VALUES.reduce((prev, curr) => 
+      const ctx = defaultConfig.context_window ?? 200000;
+      const rounded = CONTEXT_VALUES.reduce((prev, curr) =>
         Math.abs(curr - ctx) < Math.abs(prev - ctx) ? curr : prev
       );
       setContextWindow(rounded);
@@ -69,7 +69,7 @@ export function ContextWindowSlider() {
   }, [loadContextWindow]);
 
   const roundToStep = (value: number): number => {
-    return CONTEXT_VALUES.reduce((prev, curr) => 
+    return CONTEXT_VALUES.reduce((prev, curr) =>
       Math.abs(curr - value) < Math.abs(prev - value) ? curr : prev
     );
   };
@@ -133,11 +133,11 @@ export function ContextWindowSlider() {
   }, [handleChange]);
 
   const percentage = ((localValue - MIN_CONTEXT) / (MAX_CONTEXT - MIN_CONTEXT)) * 100;
-  const showWarningOverlay = localValue > 64000;
+  const showWarningOverlay = localValue > 200000;
 
   return (
     <div ref={sliderRef} className="relative">
-      {/* Warning overlay when > 64k - positioned well above the slider */}
+      {/* Warning overlay when > 200k - positioned well above the slider */}
       {showWarningOverlay && (
         <div
           className="absolute -top-20 left-1/2 -translate-x-1/2 p-2 rounded text-xs pointer-events-none z-50 transition-opacity duration-200"
@@ -152,11 +152,11 @@ export function ContextWindowSlider() {
           }}
         >
           <p className="text-center leading-tight">
-            ⚠️ Context windows larger than 64k tokens may not be supported by all API plans
+            ⚠️ Context windows larger than 200k tokens may not be supported by all models
           </p>
         </div>
       )}
-      
+
       {/* Slider container */}
       <div className="flex items-center gap-0.5 relative">
         <span className="text-[10px] font-semibold leading-none" style={{ color: 'var(--text-secondary)', lineHeight: '1' }}>
@@ -183,7 +183,7 @@ export function ContextWindowSlider() {
             }}
             disabled={isLoading}
             className="w-full h-1 rounded-lg cursor-pointer range-slider"
-            style={{ 
+            style={{
               background: `linear-gradient(to right, rgb(31, 41, 55) 0%, rgb(31, 41, 55) ${percentage}%, rgb(229, 231, 235) ${percentage}%, rgb(229, 231, 235) 100%)`
             }}
           />

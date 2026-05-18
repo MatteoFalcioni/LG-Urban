@@ -18,12 +18,12 @@ export function ChatSidebar({ onCollapse }: ChatSidebarProps) {
       <div className="flex-shrink-0">
         <ThreadSelector onCollapse={onCollapse} />
       </div>
-      
+
       {/* Messages area - scrollable */}
       <div className="flex-1 overflow-hidden">
         <MessageList />
       </div>
-      
+
       {/* Input area - fixed at bottom */}
       <div className="flex-shrink-0">
         <MessageInput />
@@ -31,4 +31,3 @@ export function ChatSidebar({ onCollapse }: ChatSidebarProps) {
     </div>
   );
 }
-

@@ -6,9 +6,10 @@ through the async call stack without explicitly threading them through
 every function parameter.
 """
 
+import uuid
 from contextvars import ContextVar
 from typing import Optional
-import uuid
+
 from sqlalchemy.ext.asyncio import AsyncSession
 
 # Context variables for the current graph execution

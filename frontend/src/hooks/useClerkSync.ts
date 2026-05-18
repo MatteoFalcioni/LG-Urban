@@ -30,4 +30,3 @@ export function useClerkSync() {
     }
   }, [user, isLoaded, setUserId]);
 }
-

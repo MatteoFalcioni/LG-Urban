@@ -19,17 +19,17 @@ except Exception:
 def clean_output(raw_text: str) -> str:
     """
     Strip ANSI escape codes and normalize line endings.
-    
+
     Use this in CI/CD tests to handle output differences between
     local terminals (with TTY) and GitHub Actions runners (no TTY).
-    
+
     ANSI codes appear as raw \\x1b[...] sequences in non-TTY environments,
     which can break string assertions.
     """
     if not raw_text:
         return ""
     # Strip ANSI escape sequences (colors, cursor movements, etc.)
-    ansi_escape = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
-    text = ansi_escape.sub('', raw_text)
+    ansi_escape = re.compile(r"\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])")
+    text = ansi_escape.sub("", raw_text)
     # Normalize line endings (Windows/Mac -> Unix)
-    return text.replace('\r\n', '\n').replace('\r', '\n').strip()
+    return text.replace("\r\n", "\n").replace("\r", "\n").strip()

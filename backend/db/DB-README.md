@@ -2,7 +2,7 @@
 
 This app uses a **dual-store design** with PostgreSQL for metadata and AWS S3 for artifact storage.
 
-**Current Deployment**: 
+**Current Deployment**:
 - **PostgreSQL**: Managed by [Railway](https://railway.app)
 - **AWS S3**: `lg-urban-prod` bucket in `eu-central-1`
 
@@ -145,7 +145,7 @@ Chat messages and tool interactions.
 | `meta` | JSONB | Metadata (tokens, costs, trace IDs) |
 | `created_at` | Timestamp | Message timestamp |
 
-**Indexes**: `(thread_id, created_at)` for ordered retrieval  
+**Indexes**: `(thread_id, created_at)` for ordered retrieval
 **Uniqueness**: `message_id` prevents duplicate submissions
 
 ---
@@ -183,7 +183,7 @@ Metadata for files generated/uploaded during conversations.
 | `meta` | JSONB | Additional metadata (includes `s3_key` and `s3_url`) |
 | `created_at` | Timestamp | Upload time |
 
-**Indexes**: `(thread_id, created_at)`, `sha256`  
+**Indexes**: `(thread_id, created_at)`, `sha256`
 **Note**: File bytes stored in AWS S3, metadata in PostgreSQL
 
 ---
@@ -199,8 +199,8 @@ Encrypted storage for user-provided API keys (OpenAI, Anthropic).
 | `created_at` | Timestamp | Key creation time |
 | `updated_at` | Timestamp | Last key update time |
 
-**Indexes**: `user_id`  
-**Security**: Keys are encrypted at rest using Fernet symmetric encryption  
+**Indexes**: `user_id`
+**Security**: Keys are encrypted at rest using Fernet symmetric encryption
 **Note**: No foreign key constraint to threads; `user_id` is a logical link for multi-tenant isolation
 
 ---
@@ -516,4 +516,3 @@ docker-compose down -v
 docker-compose up -d
 docker exec lg_urban_backend alembic upgrade head
 ```
-

@@ -30,7 +30,6 @@ from backend.main import app
 from backend.db.session import ASYNC_SESSION_MAKER, ENGINE
 from backend.db.models import Thread
 from backend.artifacts.ingest import ingest_artifact_metadata
-from dotenv import load_dotenv
 
 
 @pytest_asyncio.fixture(scope="function", autouse=True)
@@ -44,16 +43,22 @@ async def cleanup_engine():
 
 
 def _have_real_rds_and_s3() -> bool:
-    if os.getenv("DATABASE_URL") and os.getenv("S3_BUCKET") and os.getenv("AWS_ACCESS_KEY_ID") and os.getenv("AWS_SECRET_ACCESS_KEY"):
+    if (
+        os.getenv("DATABASE_URL")
+        and os.getenv("S3_BUCKET")
+        and os.getenv("AWS_ACCESS_KEY_ID")
+        and os.getenv("AWS_SECRET_ACCESS_KEY")
+    ):
         print("RDS/S3 env configured")
-        print("="*100)
+        print("=" * 100)
         print(os.getenv(f"Database URL: {os.getenv('DATABASE_URL')}"))
         print(os.getenv(f"S3 Bucket: {os.getenv('S3_BUCKET')}"))
         print(os.getenv(f"AWS Access Key ID: {os.getenv('AWS_ACCESS_KEY_ID')}"))
         print(os.getenv(f"AWS Secret Access Key: {os.getenv('AWS_SECRET_ACCESS_KEY')}"))
-        print("="*100)
+        print("=" * 100)
         return True
     return False
+
 
 @pytest.mark.asyncio
 @pytest.mark.skipif(not _have_real_rds_and_s3(), reason="RDS/S3 env not configured")
@@ -64,7 +69,7 @@ async def test_ingest_artifact_and_head_metadata():
         thread = Thread(id=thread_id, user_id="test-user")
         session.add(thread)
         await session.commit()
-        
+
         # Build a fake sha + content-addressed S3 key
         sha256 = ("cafebabe" * 8)[:64]
         s3_key = f"output/artifacts/{sha256[:2]}/{sha256[2:4]}/{sha256}"
@@ -82,7 +87,9 @@ async def test_ingest_artifact_and_head_metadata():
         )
         art_id = desc["id"]
 
-    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+    async with AsyncClient(
+        transport=ASGITransport(app=app), base_url="http://test"
+    ) as client:
         r = await client.get(f"/api/artifacts/{art_id}/head")
         assert r.status_code == 200
         data = r.json()
@@ -103,7 +110,7 @@ async def test_download_redirects_to_s3_presigned_url():
         thread = Thread(id=thread_id, user_id="test-user")
         session.add(thread)
         await session.commit()
-        
+
         sha256 = ("deadbeef" * 8)[:64]
         s3_key = f"output/artifacts/{sha256[:2]}/{sha256[2:4]}/{sha256}"
 
@@ -120,7 +127,9 @@ async def test_download_redirects_to_s3_presigned_url():
         )
         art_id = desc["id"]
 
-    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+    async with AsyncClient(
+        transport=ASGITransport(app=app), base_url="http://test"
+    ) as client:
         r = await client.get(f"/api/artifacts/{art_id}", follow_redirects=False)
         assert r.status_code in (302, 307)
         loc = r.headers.get("location") or r.headers.get("Location")
@@ -135,32 +144,27 @@ async def test_download_redirects_to_s3_presigned_url():
 @pytest.mark.skipif(not _have_real_rds_and_s3(), reason="RDS/S3 env not configured")
 async def test_end_to_end_upload_and_download_from_s3():
     """
-    End-to-end test: Upload a real file to S3, create artifact metadata, 
+    End-to-end test: Upload a real file to S3, create artifact metadata,
     then download it via the API to verify presigned URL actually works.
-    
+
     This test catches AWS signature version issues that the redirect-only test misses.
     """
     # Create test content
     test_content = b"Test artifact content for signature verification"
     sha256 = hashlib.sha256(test_content).hexdigest()
     s3_key = f"output/artifacts/{sha256[:2]}/{sha256[2:4]}/{sha256}"
-    
+
     # Upload to S3 with proper signature version
     bucket = os.getenv("S3_BUCKET")
     region = os.getenv("AWS_REGION", "eu-central-1")
     s3_client = boto3.client(
-        "s3",
-        region_name=region,
-        config=Config(signature_version='s3v4')
+        "s3", region_name=region, config=Config(signature_version="s3v4")
     )
-    
+
     s3_client.put_object(
-        Bucket=bucket,
-        Key=s3_key,
-        Body=test_content,
-        ContentType="text/plain"
+        Bucket=bucket, Key=s3_key, Body=test_content, ContentType="text/plain"
     )
-    
+
     try:
         # Create artifact metadata in database
         async with ASYNC_SESSION_MAKER() as session:
@@ -168,7 +172,7 @@ async def test_end_to_end_upload_and_download_from_s3():
             thread = Thread(id=thread_id, user_id="test-user")
             session.add(thread)
             await session.commit()
-            
+
             desc = await ingest_artifact_metadata(
                 session=session,
                 thread_id=thread_id,
@@ -181,15 +185,21 @@ async def test_end_to_end_upload_and_download_from_s3():
                 tool_call_id="e2e-test-tool",
             )
             art_id = desc["id"]
-        
+
         # Download via API (follow redirects to actually fetch from S3)
-        async with AsyncClient(app=app, base_url="http://test", follow_redirects=True) as client:
+        async with AsyncClient(
+            app=app, base_url="http://test", follow_redirects=True
+        ) as client:
             r = await client.get(f"/api/artifacts/{art_id}")
             assert r.status_code == 200, f"Download failed with status {r.status_code}"
-            assert r.content == test_content, "Downloaded content doesn't match uploaded content"
-            
-        print(f"✅ Successfully uploaded and downloaded artifact with SHA256: {sha256[:16]}...")
-        
+            assert (
+                r.content == test_content
+            ), "Downloaded content doesn't match uploaded content"
+
+        print(
+            f"✅ Successfully uploaded and downloaded artifact with SHA256: {sha256[:16]}..."
+        )
+
     finally:
         # Cleanup: delete test object from S3
         try:

@@ -1,7 +1,7 @@
-from typing_extensions import Annotated
-from langchain.tools import tool, ToolRuntime
+from langchain.tools import ToolRuntime, tool
 from langchain_core.messages import ToolMessage
 from langgraph.types import Command
+from typing_extensions import Annotated
 
 
 @tool
@@ -109,7 +109,7 @@ async def approve_analysis_tool(runtime: ToolRuntime) -> Command:
                     tool_call_id=runtime.tool_call_id,
                 )
             ],
-            "reroute_count" : -1  # resets to 0
+            "reroute_count": -1,  # resets to 0
         }
     )
 
@@ -153,7 +153,7 @@ async def update_completeness_score(
     state = runtime.state
     num_todos = len(state.get("todos", []))
 
-    if num_todos == 0:  # no update to score means default value, which is 0 
+    if num_todos == 0:  # no update to score means default value, which is 0
         return Command(
             update={
                 "messages": [
@@ -171,7 +171,7 @@ async def update_completeness_score(
         update={
             "messages": [
                 ToolMessage(
-                    content=f"Completeness score updated to: {grade/num_todos:.2f}",
+                    content=f"Completeness score updated to: {grade / num_todos:.2f}",
                     tool_call_id=runtime.tool_call_id,
                 )
             ],
@@ -210,7 +210,7 @@ async def update_relevancy_score(
         update={
             "messages": [
                 ToolMessage(
-                    content=f"Relevancy score updated to: {grade/num_sources:.2f}",
+                    content=f"Relevancy score updated to: {grade / num_sources:.2f}",
                     tool_call_id=runtime.tool_call_id,
                 )
             ],

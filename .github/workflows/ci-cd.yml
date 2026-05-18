@@ -5,7 +5,7 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
-  workflow_dispatch: 
+  workflow_dispatch:
 
 env:
   PYTHON_VERSION: "3.11"
@@ -23,7 +23,7 @@ jobs:
       frontend: ${{ steps.filter.outputs.frontend }}
     steps:
       - uses: actions/checkout@v4
-      
+
       - uses: dorny/paths-filter@v3
         id: filter
         with:
@@ -46,28 +46,28 @@ jobs:
     needs: detect-changes
     if: needs.detect-changes.outputs.modal == 'true' || needs.detect-changes.outputs.backend == 'true' || github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
-    
+
     steps:
       - uses: actions/checkout@v4
-      
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           cache: 'pip'
-      
+
       - name: Install dependencies
         run: |
           pip install --upgrade pip
           pip install -r requirements.txt
-      
+
       - name: Test Modal driver (local, no S3)
         run: |
           echo "Testing Modal driver locally..."
           pytest backend/modal_runtime/tests/test_driver_e2e.py backend/modal_runtime/tests/test_driver_artifacts.py -v --tb=short
         env:
           S3_DISABLE_UPLOAD: "1"
-      
+
       - name: Deploy Modal app (updates driver.py in Modal image)
         env:
           MODAL_TOKEN_ID: ${{ secrets.MODAL_TOKEN_ID }}
@@ -75,7 +75,7 @@ jobs:
         run: |
           echo "Deploying Modal app to update driver.py..."
           modal deploy backend/modal_runtime/app.py
-      
+
       - name: Test Modal sandbox executor (requires Modal tokens)
         env:
           MODAL_TOKEN_ID: ${{ secrets.MODAL_TOKEN_ID }}
@@ -83,7 +83,7 @@ jobs:
         run: |
           echo "Testing Modal sandbox..."
           pytest backend/modal_runtime/tests -v --tb=short -s
-      
+
       - name: Test sandbox tools (integration tests with executor.execute)
         env:
           MODAL_TOKEN_ID: ${{ secrets.MODAL_TOKEN_ID }}
@@ -102,30 +102,30 @@ jobs:
     needs: detect-changes
     if: needs.detect-changes.outputs.migrations == 'true' || needs.detect-changes.outputs.backend == 'true' || github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
-    
+
     steps:
       - uses: actions/checkout@v4
-      
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           cache: 'pip'
-      
+
       - name: Install dependencies
         run: |
           pip install --upgrade pip
           pip install -r requirements.txt
-      
+
       # Start Docker Compose with the infra setup
       - name: Create Docker network
         run: docker network create langgraph-network || true
-      
+
       - name: Start Postgres with Docker Compose
         run: |
           cd infra
           docker compose up -d db
-          
+
       - name: Wait for Postgres to be ready
         run: |
           echo "Waiting for Postgres..."
@@ -137,7 +137,7 @@ jobs:
             echo "Waiting... ($i/30)"
             sleep 2
           done
-      
+
       - name: Run migrations
         env:
           ALEMBIC_DATABASE_URL: postgresql+psycopg2://postgres:postgres@localhost:5432/chat
@@ -145,7 +145,7 @@ jobs:
           echo "Running Alembic migrations..."
           alembic upgrade head
           alembic current
-      
+
       - name: Test migration rollback/upgrade cycle
         env:
           ALEMBIC_DATABASE_URL: postgresql+psycopg2://postgres:postgres@localhost:5432/chat
@@ -154,7 +154,7 @@ jobs:
           # Get current revision
           CURRENT=$(alembic current | grep -oP '(?<=^)[a-f0-9]+' | head -1)
           echo "Current revision: $CURRENT"
-          
+
           # Only test downgrade if we have a revision and it's not base
           if [ ! -z "$CURRENT" ] && [ "$CURRENT" != "base" ]; then
             echo "Testing downgrade to base and upgrade back to head..."
@@ -164,7 +164,7 @@ jobs:
           else
             echo "✅ At base or no migrations, skipping downgrade test"
           fi
-      
+
       - name: Cleanup
         if: always()
         run: |
@@ -177,29 +177,29 @@ jobs:
     needs: detect-changes
     if: needs.detect-changes.outputs.backend == 'true' || github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
-    
+
     steps:
       - uses: actions/checkout@v4
-      
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           cache: 'pip'
-      
+
       - name: Install dependencies
         run: |
           pip install --upgrade pip
           pip install -r requirements.txt
-      
+
       - name: Create Docker network
         run: docker network create langgraph-network || true
-      
+
       - name: Start Postgres with Docker Compose
         run: |
           cd infra
           docker compose up -d db
-      
+
       - name: Wait for Postgres to be ready
         run: |
           echo "Waiting for Postgres..."
@@ -211,12 +211,12 @@ jobs:
             echo "Waiting... ($i/30)"
             sleep 2
           done
-      
+
       - name: Run migrations
         env:
           ALEMBIC_DATABASE_URL: postgresql+psycopg2://postgres:postgres@localhost:5432/chat
         run: alembic upgrade head
-      
+
       - name: Run API tests
         env:
           DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/chat
@@ -225,7 +225,7 @@ jobs:
         run: |
           echo "Running API health checks..."
           pytest tests/api/ -v --tb=short
-      
+
       - name: Cleanup
         if: always()
         run: |
@@ -236,18 +236,18 @@ jobs:
   lint:
     name: Lint Code
     runs-on: ubuntu-latest
-    
+
     steps:
       - uses: actions/checkout@v4
-      
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
-      
+
       - name: Install linting tools
         run: pip install ruff
-      
+
       - name: Run ruff
         run: ruff check backend/
 
@@ -257,29 +257,29 @@ jobs:
     needs: detect-changes
     if: needs.detect-changes.outputs.frontend == 'true' || github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
-    
+
     steps:
       - uses: actions/checkout@v4
-      
+
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '20'
           cache: 'npm'
           cache-dependency-path: 'frontend/package-lock.json'
-      
+
       - name: Install frontend dependencies
         working-directory: frontend
         run: npm ci
-      
+
       - name: Run TypeScript type check
         working-directory: frontend
         run: npx tsc --noEmit
-      
+
       - name: Run ESLint
         working-directory: frontend
         run: npx eslint . --ext ts,tsx --report-unused-disable-directives
-      
+
       - name: Build frontend
         working-directory: frontend
         run: npm run build
@@ -292,4 +292,3 @@ jobs:
   # The functions in backend/modal_runtime/functions.py are DEPRECATED.
   # They are no longer used in production - we use executor.execute() instead.
   # See backend/modal_runtime/functions.py for full explanation.
-

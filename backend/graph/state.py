@@ -1,5 +1,6 @@
-from langchain.agents import AgentState
 from typing import Annotated, Literal
+
+from langchain.agents import AgentState
 
 
 def list_add_dicts(
@@ -9,7 +10,7 @@ def list_add_dicts(
     Add a new item to a list. No deduplication.
     Used for:
         * code: running the same code twice is meaningful;
-    
+
     Added reset: if we pass an empty list, and left is not empty, it will return [].
     """
     if left is None:
@@ -30,7 +31,7 @@ def dict_merge(
     Merge two dicts. Right overwrites left for duplicate keys.
     Used for:
         * reports: we want to accumulate several reports over different analyses
-    
+
     Added reset: if we pass an empty dict, and left is not empty, it will return {}.
     """
     if left is None:
@@ -46,7 +47,7 @@ def dict_merge(
 
 def list_replace(left: list[str] | None, right: list[str] | None) -> list[str]:
     """
-    Replace list of strings entirely instead of concatenating. 
+    Replace list of strings entirely instead of concatenating.
     Used for:
         * code logs chunks: these are the logs read by the agent at each run - overwrite
         * sources: sources are the datasets used in the current analysis - overwriting the previous ones is needed;
@@ -96,7 +97,7 @@ def int_add(left: int | None, right: int | None) -> int:
 
     if left is not None and right == -1:
         return 0
-        
+
     return left + right
 
 
@@ -114,37 +115,38 @@ def float_replace(left: float | None, right: float | None) -> float:
 # If we try to pass the todos update to the general state, this will fail because the middleware
 # automatically adds the state var only to the agent that has that middleware!
 
+
 class MyState(AgentState):
     """
     Custom state for the graph. Inherits from AgentState -> automatically contains messages.
 
     Additional state variables:
-        * sources (`list[str]`): 
+        * sources (`list[str]`):
             list of dataset ids used in the analysis;
-        * reports (`dict[str, str]`): 
-            dict of reports written by the report writer agent. 
+        * reports (`dict[str, str]`):
+            dict of reports written by the report writer agent.
             Key is title, value is content. They accumulate over different analyses;
-        * last_report_title (`str`): 
+        * last_report_title (`str`):
             title of the last report written;
-        * code_logs (`list[dict[str, str]]`): 
+        * code_logs (`list[dict[str, str]]`):
             list of dicts containing input code and output+err logs;
-        * code_logs_chunks (`list[str]`): 
-            list of strings, each string is a chunk of already ordered code logs. 
+        * code_logs_chunks (`list[str]`):
+            list of strings, each string is a chunk of already ordered code logs.
             Needed for better code reading for the agents;
-        * analysis_status (`Literal["pending", "approved", "rejected", "limit_exceeded", "end_flow"]`): 
+        * analysis_status (`Literal["pending", "approved", "rejected", "limit_exceeded", "end_flow"]`):
             status of the analysis. Can be: pending, approved, rejected, limit_exceeded, end_flow;
-        * analysis_comments (`str`): 
+        * analysis_comments (`str`):
             comments for the analyst to improve the analysis;
-        * reroute_count (`int`): 
+        * reroute_count (`int`):
             counter of how many times the analysis was re-routed to analyst with comments;
-        * completeness_score (`float`): 
+        * completeness_score (`float`):
             score of the completeness of the analysis;
-        * relevancy_score (`float`): 
+        * relevancy_score (`float`):
             score of the relevancy of the analysis;
-        * final_score (`float`): 
+        * final_score (`float`):
             final score of the analysis;
-        * todos (`list[dict]`): 
-            list of todos for the analyst to perform. 
+        * todos (`list[dict]`):
+            list of todos for the analyst to perform.
     """
 
     # ---- report features ----

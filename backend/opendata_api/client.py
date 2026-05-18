@@ -1,6 +1,7 @@
 # bologna_opendata.py
+from typing import Any, Dict, Optional
+
 import httpx
-from typing import Optional, Dict, Any
 
 BASE_URL = "https://opendata.comune.bologna.it/api/explore/v2.1"
 
@@ -206,9 +207,7 @@ class BolognaOpenData:
             of rows, so always filter.
         """
         params = {"select": select, "limit": limit, "offset": offset}
-        if (
-            where
-        ):  # we won't use where in agentic workflows, we'll take it out when using this as a @tool
+        if where:  # we won't use where in agentic workflows, we'll take it out when using this as a @tool
             params["where"] = where
         if order_by:
             params["order_by"] = order_by
@@ -230,7 +229,9 @@ class BolognaOpenData:
                 return r.json()
             raise
 
-    async def export_to_file(self, dataset_id: str, path: str, fmt: str = "parquet") -> None:
+    async def export_to_file(
+        self, dataset_id: str, path: str, fmt: str = "parquet"
+    ) -> None:
         """
         Download the full dataset directly to a file using streaming.
         This avoids loading the entire dataset into memory.
@@ -241,7 +242,7 @@ class BolognaOpenData:
             fmt: format string (default "parquet").
         """
         await self._ensure_client_ready()
-        
+
         async def _stream_download():
             async with self._client.stream(
                 "GET", f"/catalog/datasets/{dataset_id}/exports/{fmt}"
@@ -265,12 +266,12 @@ class BolognaOpenData:
         Download the full dataset in one file (no row limit).
         kept for backward compatibility.
         """
-        import tempfile
         import os
-        
+        import tempfile
+
         with tempfile.NamedTemporaryFile(delete=False) as tmp:
             tmp_path = tmp.name
-        
+
         try:
             await self.export_to_file(dataset_id, tmp_path, fmt)
             with open(tmp_path, "rb") as f:

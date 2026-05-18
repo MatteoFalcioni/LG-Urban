@@ -61,7 +61,7 @@ Your Laptop                AWS VPC
    aws ec2 stop-instances --instance-ids i-03509b694daca01ef
    aws ec2 start-instances --instance-ids i-03509b694daca01ef  # when needed
    ```
-   
+
    ⚠️ **Note**: After restart, bastion's Public IP may change. Update IP in `~/start-rds-tunnel.sh` and `new_tests/conftest.py`. Find it in [console](https://eu-central-1.console.aws.amazon.com/ec2/home?region=eu-central-1#InstanceDetails:instanceId=i-03509b694daca01ef) under **Public IPv4 address**
 
 3. **Stop RDS in dev environments** (production should stay running)
@@ -169,7 +169,7 @@ psql "$DATABASE_URL"
 
 ## Managing the Tunnels
 
-### Automatic Tunnel 
+### Automatic Tunnel
 
 The `new_tests/conftest.py` contains a pytest fixture that:
 1. Checks if `DATABASE_URL` uses `localhost`
@@ -305,6 +305,3 @@ Then just run:
 rds-tunnel  # Start tunnel (in one terminal)
 rds-connect # Set env vars (in another terminal)
 ```
-
-
-

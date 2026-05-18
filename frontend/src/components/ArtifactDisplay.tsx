@@ -31,7 +31,7 @@ export function ArtifactDisplay() {
 
     // Combine and deduplicate by artifact ID
     const allArtifacts = [...messageArtifacts, ...streamingArtifacts];
-    const uniqueArtifacts = allArtifacts.filter((artifact, index, self) => 
+    const uniqueArtifacts = allArtifacts.filter((artifact, index, self) =>
       index === self.findIndex(a => a.id === artifact.id)
     );
 
@@ -43,10 +43,10 @@ export function ArtifactDisplay() {
   // Check if user is near bottom (to show/hide scroll button)
   const handleScroll = useCallback(() => {
     if (!scrollContainerRef.current) return;
-    
+
     const { scrollTop, scrollHeight, clientHeight } = scrollContainerRef.current;
     const distanceFromBottom = scrollHeight - scrollTop - clientHeight;
-    
+
     // Show button if more than 100px from bottom
     setShowScrollButton(distanceFromBottom > 100);
   }, []);
@@ -103,8 +103,8 @@ export function ArtifactDisplay() {
 
   return (
     <div className="relative h-full w-full">
-      <div 
-        ref={scrollContainerRef} 
+      <div
+        ref={scrollContainerRef}
         onScroll={handleScroll}
         className="h-full w-full overflow-auto"
       >
@@ -117,7 +117,7 @@ export function ArtifactDisplay() {
               {artifacts.length} visualization{artifacts.length !== 1 ? 's' : ''} generated
             </p>
           </div>
-          
+
           <ArtifactGrid artifacts={artifacts} />
         </div>
       </div>
@@ -135,8 +135,3 @@ export function ArtifactDisplay() {
     </div>
   );
 }
-
-
-
-
-

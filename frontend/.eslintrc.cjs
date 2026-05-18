@@ -20,4 +20,3 @@ module.exports = {
     'no-constant-condition': ['error', { checkLoops: false }], // Allow while(true) loops
   },
 }
-

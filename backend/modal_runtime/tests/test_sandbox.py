@@ -1,9 +1,9 @@
 import os
-import pytest
-from dotenv import load_dotenv
 import uuid
 
+import pytest
 from conftest import clean_output
+from dotenv import load_dotenv
 
 load_dotenv()
 

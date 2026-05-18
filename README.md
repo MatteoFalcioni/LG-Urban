@@ -8,6 +8,19 @@ Built on LangGraph, this application enables users to perform comprehensive data
 
 ---
 
+<div align="center">
+
+### 📊 Evaluation Results Available!
+
+We evaluated UrbIA on **100 question-answer pairs** covering various urban data analysis tasks.
+Check out the full evaluation framework and results:
+
+**[🔗 judge-my-urbia - Evaluation Framework](https://github.com/MatteoFalcioni/judge-my-urbia)**
+
+</div>
+
+---
+
 ## 🎯 Core Features
 
 ### 💬 Intelligent Conversations
@@ -85,7 +98,7 @@ alembic upgrade head
 
 ### 4. ▶️ Run Backend
 ```bash
-cd ~/UrbIA
+cd UrbIA
 uvicorn backend.main:app --reload --port 8000
 ```
 
@@ -133,8 +146,8 @@ Visit `http://localhost:5173` 🎉
   │          │ │    │   caching) │
   │          │ │    └────────────┘
   │ •App DB  │ │
-  │ •LG CKPTs│ │    
-  └──────────┘ │    
+  │ •LG CKPTs│ │
+  └──────────┘ │
                │
         ┌──────▼─────────┐
         │  Modal.com     │
@@ -205,6 +218,3 @@ npx tsc --noEmit  # Type checking
 npm run lint      # ESLint
 npm run build     # Production build
 ```
-
-
-

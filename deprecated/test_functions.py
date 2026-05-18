@@ -19,7 +19,6 @@ _check_modal_tokens()
 
 @app.local_entrypoint()  # used in order to run `modal run test_functions.py` from shell
 def test_dataset_functions_flow_write_list_then_optional_export():
-
     from backend.modal_runtime.functions import (
         write_dataset_bytes,
         list_loaded_datasets,
