@@ -21,7 +21,7 @@ export function ContextWindowSlider() {
   const currentThreadId = useChatStore((state) => state.currentThreadId);
   const defaultConfig = useChatStore((state) => state.defaultConfig);
   const setDefaultConfig = useChatStore((state) => state.setDefaultConfig);
-  
+
   const [contextWindow, setContextWindow] = useState<number>(200000);
   const [localValue, setLocalValue] = useState<number>(200000); // For smooth visual feedback during drag
   const [isLoading, setIsLoading] = useState(false);
@@ -35,7 +35,7 @@ export function ContextWindowSlider() {
       // No thread: use default config
       const ctx = defaultConfig.context_window ?? 200000;
       // Round to nearest valid value
-      const rounded = CONTEXT_VALUES.reduce((prev, curr) => 
+      const rounded = CONTEXT_VALUES.reduce((prev, curr) =>
         Math.abs(curr - ctx) < Math.abs(prev - ctx) ? curr : prev
       );
       setContextWindow(rounded);
@@ -47,7 +47,7 @@ export function ContextWindowSlider() {
       const config = await getThreadConfig(currentThreadId);
       const ctx = config.context_window ?? defaultConfig.context_window ?? 200000;
       // Round to nearest valid value
-      const rounded = CONTEXT_VALUES.reduce((prev, curr) => 
+      const rounded = CONTEXT_VALUES.reduce((prev, curr) =>
         Math.abs(curr - ctx) < Math.abs(prev - ctx) ? curr : prev
       );
       setContextWindow(rounded);
@@ -55,7 +55,7 @@ export function ContextWindowSlider() {
     } catch (err) {
       console.error('Failed to load thread config:', err);
       const ctx = defaultConfig.context_window ?? 200000;
-      const rounded = CONTEXT_VALUES.reduce((prev, curr) => 
+      const rounded = CONTEXT_VALUES.reduce((prev, curr) =>
         Math.abs(curr - ctx) < Math.abs(prev - ctx) ? curr : prev
       );
       setContextWindow(rounded);
@@ -69,7 +69,7 @@ export function ContextWindowSlider() {
   }, [loadContextWindow]);
 
   const roundToStep = (value: number): number => {
-    return CONTEXT_VALUES.reduce((prev, curr) => 
+    return CONTEXT_VALUES.reduce((prev, curr) =>
       Math.abs(curr - value) < Math.abs(prev - value) ? curr : prev
     );
   };
@@ -156,7 +156,7 @@ export function ContextWindowSlider() {
           </p>
         </div>
       )}
-      
+
       {/* Slider container */}
       <div className="flex items-center gap-0.5 relative">
         <span className="text-[10px] font-semibold leading-none" style={{ color: 'var(--text-secondary)', lineHeight: '1' }}>
@@ -183,7 +183,7 @@ export function ContextWindowSlider() {
             }}
             disabled={isLoading}
             className="w-full h-1 rounded-lg cursor-pointer range-slider"
-            style={{ 
+            style={{
               background: `linear-gradient(to right, rgb(31, 41, 55) 0%, rgb(31, 41, 55) ${percentage}%, rgb(229, 231, 235) ${percentage}%, rgb(229, 231, 235) 100%)`
             }}
           />

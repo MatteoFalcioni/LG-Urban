@@ -72,7 +72,7 @@ Thumbs.db
 tmp/
 temp/
 
-# heavy data 
+# heavy data
 heavy_llm_data/
 
 # AWS, RDS
@@ -85,4 +85,3 @@ start-rds-tunnel-COPY.sh
 # legacy code
 *legacy*
 legacy/
-

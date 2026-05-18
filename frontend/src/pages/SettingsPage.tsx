@@ -28,7 +28,7 @@ export function SettingsPage() {
   });
   const [isSaving, setIsSaving] = useState(false);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'success' | 'error'>('idle');
-  
+
   // API Keys state
   const [apiKeyInput, setApiKeyInput] = useState('');
   const [showKey, setShowKey] = useState(false);
@@ -158,16 +158,16 @@ export function SettingsPage() {
       if (apiKeyInput) {
         keysToSave.openrouter_key = apiKeyInput;
       }
-      
+
       await saveUserApiKeys(userId, keysToSave);
-      
+
       // Update store with the key that was saved
       if (apiKeyInput) {
         setApiKeys({ openrouter: apiKeyInput });
       }
-      
+
       setKeysSaveStatus('success');
-      
+
       // Redirect to chat after successful save (so warning disappears)
       setTimeout(() => {
         navigate('/');
@@ -230,9 +230,9 @@ export function SettingsPage() {
                   console.log('Select focused - computed value:', config.model || defaultConfig.model || 'claude-sonnet-4.6');
                 }}
                 className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-gray-800 dark:focus:ring-gray-600 focus:border-gray-800 dark:focus:border-gray-600 transition-all outline-none"
-                style={{ 
-                  border: '1px solid var(--border)', 
-                  backgroundColor: 'var(--bg-secondary)', 
+                style={{
+                  border: '1px solid var(--border)',
+                  backgroundColor: 'var(--bg-secondary)',
                   color: 'var(--text-primary)'
                 }}
               >
@@ -257,7 +257,7 @@ export function SettingsPage() {
                 value={config.temperature ?? defaultConfig.temperature ?? 0.5}
                 onChange={(e) => setConfig((prev) => ({ ...prev, temperature: parseFloat(e.target.value) }))}
                 className="w-full h-2 rounded-lg cursor-pointer range-slider"
-                style={{ 
+                style={{
                   background: `linear-gradient(to right, #1f2937 0%, #1f2937 ${((config.temperature ?? defaultConfig.temperature ?? 0.5) / 1) * 100}%, #e5e7eb ${((config.temperature ?? defaultConfig.temperature ?? 0.5) / 1) * 100}%, #e5e7eb 100%)`
                 }}
               />
@@ -280,9 +280,9 @@ export function SettingsPage() {
                 value={config.context_window ?? defaultConfig.context_window ?? 200000}
                 onChange={(e) => setConfig((prev) => ({ ...prev, context_window: parseInt(e.target.value) }))}
                 className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-gray-800 dark:focus:ring-gray-600 focus:border-gray-800 dark:focus:border-gray-600 transition-all outline-none"
-                style={{ 
-                  border: '1px solid var(--border)', 
-                  backgroundColor: 'var(--bg-secondary)', 
+                style={{
+                  border: '1px solid var(--border)',
+                  backgroundColor: 'var(--bg-secondary)',
                   color: 'var(--text-primary)'
                 }}
               />
@@ -306,9 +306,9 @@ export function SettingsPage() {
                 onChange={(e) => setConfig((prev) => ({ ...prev, system_prompt: e.target.value }))}
                 rows={6}
                 className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-gray-800 dark:focus:ring-gray-600 focus:border-gray-800 dark:focus:border-gray-600 transition-all resize-none outline-none"
-                style={{ 
-                  border: '1px solid var(--border)', 
-                  backgroundColor: 'var(--bg-secondary)', 
+                style={{
+                  border: '1px solid var(--border)',
+                  backgroundColor: 'var(--bg-secondary)',
                   color: 'var(--text-primary)'
                 }}
               />
@@ -323,7 +323,7 @@ export function SettingsPage() {
               <Save size={16} />
               {isSaving ? 'Saving...' : 'Save Configuration'}
             </button>
-            
+
             {saveStatus === 'success' && (
               <p className="text-sm text-green-600 dark:text-green-400 text-center">
                 ✓ Configuration saved successfully
@@ -347,9 +347,9 @@ export function SettingsPage() {
           <div className="space-y-4">
             <p className="text-sm text-gray-600 dark:text-slate-400">
               Your OpenRouter API key is encrypted and stored securely. Get your key from{' '}
-              <a 
-                href="https://openrouter.ai/keys" 
-                target="_blank" 
+              <a
+                href="https://openrouter.ai/keys"
+                target="_blank"
                 rel="noopener noreferrer"
                 className="text-blue-500 hover:text-blue-600 underline"
               >
@@ -367,9 +367,9 @@ export function SettingsPage() {
                   onChange={(e) => setApiKeyInput(e.target.value)}
                   placeholder="sk-or-v1-... (enter new key or leave empty to keep existing)"
                   className="w-full px-3 py-2 pr-10 border rounded-lg focus:ring-2 focus:ring-gray-800 dark:focus:ring-gray-600 focus:border-gray-800 dark:focus:border-gray-600 transition-all outline-none"
-                  style={{ 
-                    border: '1px solid var(--border)', 
-                    backgroundColor: 'var(--bg-secondary)', 
+                  style={{
+                    border: '1px solid var(--border)',
+                    backgroundColor: 'var(--bg-secondary)',
                     color: 'var(--text-primary)'
                   }}
                 />
@@ -392,7 +392,7 @@ export function SettingsPage() {
               <Save size={16} />
               {isSavingKeys ? 'Saving...' : 'Save API Key'}
             </button>
-            
+
             {keysSaveStatus === 'success' && (
               <p className="text-sm text-green-600 dark:text-green-400 text-center">
                 ✓ API key saved successfully
@@ -410,4 +410,3 @@ export function SettingsPage() {
     </div>
   );
 }
-

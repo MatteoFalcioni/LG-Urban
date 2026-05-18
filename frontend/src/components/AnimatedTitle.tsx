@@ -21,7 +21,7 @@ export function AnimatedTitle({ title, className = '', duration = 400 }: Animate
     // Only animate if the title actually changed
     if (title !== previousTitleRef.current) {
       setIsAnimating(true);
-      
+
       // Clear any existing timeout
       if (timeoutRef.current) {
         clearTimeout(timeoutRef.current);
@@ -31,7 +31,7 @@ export function AnimatedTitle({ title, className = '', duration = 400 }: Animate
       timeoutRef.current = setTimeout(() => {
         setDisplayedTitle(title);
         previousTitleRef.current = title;
-        
+
         // End animation quickly
         setTimeout(() => {
           setIsAnimating(false);
@@ -50,7 +50,7 @@ export function AnimatedTitle({ title, className = '', duration = 400 }: Animate
   }, []);
 
   return (
-    <span 
+    <span
       className={`transition-all ease-out ${
         isAnimating ? 'opacity-40 scale-98' : 'opacity-100 scale-100'
       } ${className}`}

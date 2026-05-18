@@ -15,7 +15,7 @@ export function CreativitySlider() {
   const currentThreadId = useChatStore((state) => state.currentThreadId);
   const defaultConfig = useChatStore((state) => state.defaultConfig);
   const setDefaultConfig = useChatStore((state) => state.setDefaultConfig);
-  
+
   const [temperature, setTemperature] = useState<number>(0.5);
   const [localValue, setLocalValue] = useState<number>(0.5); // For smooth visual feedback during drag
   const [isLoading, setIsLoading] = useState(false);
@@ -137,7 +137,7 @@ export function CreativitySlider() {
             }}
             disabled={isLoading}
             className="w-full h-1 rounded-lg cursor-pointer range-slider"
-            style={{ 
+            style={{
               background: `linear-gradient(to right, rgb(31, 41, 55) 0%, rgb(31, 41, 55) ${percentage}%, rgb(229, 231, 235) ${percentage}%, rgb(229, 231, 235) 100%)`
             }}
           />
@@ -157,4 +157,3 @@ export function CreativitySlider() {
     </div>
   );
 }
-

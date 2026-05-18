@@ -6,9 +6,9 @@ Uses Fernet symmetric encryption for secure storage.
 import base64
 import os
 from pathlib import Path
-from cryptography.fernet import Fernet
 from typing import Optional
 
+from cryptography.fernet import Fernet
 
 # Cache the encryption key to ensure consistency across the application lifecycle
 _encryption_key_cache: Optional[bytes] = None

@@ -23,12 +23,12 @@ export function ChatPage() {
   const setArtifactsPanelWidth = useChatStore((s) => s.setArtifactsPanelWidth);
   const analysisScore = useChatStore((s) => s.analysisScore);
   const analysisStatus = useChatStore((s) => s.analysisStatus);
-  
+
   const isResizing = useRef(false);
   const startWidth = useRef(0);
   const startX = useRef(0);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
-  
+
   const isResizingRight = useRef(false);
   const startWidthRight = useRef(0);
   const startXRight = useRef(0);
@@ -85,7 +85,7 @@ export function ChatPage() {
     <div className="flex h-screen bg-gray-50 dark:bg-slate-900 text-gray-700 dark:text-slate-200 overflow-hidden">
       {/* API Key Warning Modal */}
       <ApiKeyWarning />
-      
+
       {/* Sidebar: Thread list (resizable/collapsible) */}
       {!isSidebarCollapsed && (
         <aside
@@ -120,7 +120,7 @@ export function ChatPage() {
           <div className="flex-1 min-w-0">
             <ScoreBar score={analysisScore} status={analysisStatus} />
           </div>
-          
+
           {/* Right side: Controls */}
           <div className="flex items-center gap-2">
             <TodoListDropdown />
@@ -140,7 +140,7 @@ export function ChatPage() {
           </button>
           </div>
         </div>
-        
+
         {/* Artifact display area */}
         <div className="flex-1 overflow-hidden">
           <ArtifactDisplay />
@@ -164,4 +164,3 @@ export function ChatPage() {
     </div>
   );
 }
-

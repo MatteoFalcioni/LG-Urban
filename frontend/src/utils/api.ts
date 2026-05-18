@@ -13,7 +13,7 @@ const BASE_URL = import.meta.env.VITE_API_URL || '/api';
 async function fetchWithTimeout(url: string, options: RequestInit = {}, timeout = 10000): Promise<Response> {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), timeout);
-  
+
   try {
     const response = await fetch(url, {
       ...options,
@@ -130,9 +130,9 @@ export async function updateThreadConfig(threadId: string, config: Partial<Threa
 
 // ===== Thread State =====
 
-export async function getThreadState(threadId: string): Promise<{ 
-  token_count: number; 
-  context_window: number; 
+export async function getThreadState(threadId: string): Promise<{
+  token_count: number;
+  context_window: number;
   todos: Todo[];
   report_title: string;
   report_content: string;
@@ -178,4 +178,3 @@ export async function saveUserApiKeys(userId: string, keys: APIKeys): Promise<AP
   if (!res.ok) throw new Error(`Failed to save API keys: ${res.statusText}`);
   return res.json();
 }
-

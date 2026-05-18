@@ -1,8 +1,8 @@
 # Modal Runtime
 
-In this folder you can find the implementation of the core funcionality of UrbIA: its data analysis capabilities. 
+In this folder you can find the implementation of the core funcionality of UrbIA: its data analysis capabilities.
 
-We assume that the ability to execute python code with context knowledge and complex reasoning can give rise to high data-analysis capabilities; therefore we give the agent the possibility to write and run Python code **in a sandbox environment**. The latter is managed by *Modal*. 
+We assume that the ability to execute python code with context knowledge and complex reasoning can give rise to high data-analysis capabilities; therefore we give the agent the possibility to write and run Python code **in a sandbox environment**. The latter is managed by *Modal*.
 
 ## Implementation Details
 
@@ -12,9 +12,9 @@ Following [Modal's documentation](https://modal.com/docs) we first create an **a
 app = modal.App("lg-urban-executor")
 ```
 
-and a **driver** in [driver.py](./driver.py). 
+and a **driver** in [driver.py](./driver.py).
 
-**CRUCIAL**: you need to deploy these objects into the cloud with 
+**CRUCIAL**: you need to deploy these objects into the cloud with
 
 ```bash
 
@@ -24,7 +24,7 @@ modal deploy backend/modal_runtime/app.py
 
 The purpose of this driver is to be always running while the sandbox exist, in order to keep it warm, and to redirect code input with stdin/stdout: it can do this since the driver is running *inside the sandbox*.
 
-Furthermore, it also: 
+Furthermore, it also:
 - mantains the sandbox stateful by updating the `globals` dictionary with the local variables produced at each run;
 - scans the work directory for produced artifacts and uploads them to S3 directly from inside the sandbox using `boto3`.
 
@@ -33,16 +33,16 @@ S3 specifics:
 - AWS credentials must be available in the sandbox (Modal Secret or env vars).
 - Uploads use content-addressed keys: `output/artifacts/<sha256[:2]>/<sha256[2:4]>/<sha256>`.
 
-We put everything together inside the [**SandboxExecutor**](./executor.py) class: at inizialition, it creates the sandbox with a mounted volume for persistence of the workspace during the run, and starts the driver. 
+We put everything together inside the [**SandboxExecutor**](./executor.py) class: at inizialition, it creates the sandbox with a mounted volume for persistence of the workspace during the run, and starts the driver.
 
-It only has 2 methods: 
+It only has 2 methods:
 
 - `execute` to execute a given code (through the driver);
 - `terminate` to terminate the sandbox istance at session end;
 
 ## Important Notes
 
-There is an important difference between using `App.lookup` or just `App` in `Modal`. 
+There is an important difference between using `App.lookup` or just `App` in `Modal`.
 
 ### `app = modal.App("name")`
 Creates/defines an app with functions attached to it.
@@ -72,6 +72,3 @@ Inside the [tests/](./tests/) folder we wrote basic tests to check the implement
   - Uses a temporary `ARTIFACTS_DIR` to avoid uploading to S3 during the test
 
 - `test_code_exec.py`: tests the full `SandboxExecutor` class (instantiation, execution, and termination).
-
-
-

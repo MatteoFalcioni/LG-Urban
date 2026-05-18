@@ -2,23 +2,22 @@
 
 from __future__ import annotations
 
-import os
-import json
 import asyncio
+import json
 import logging
+import os
 from concurrent.futures import ThreadPoolExecutor
 from typing import Dict
+
+from langchain.tools import ToolRuntime, tool
+from langchain_core.messages import ToolMessage
+from langgraph.types import Command
 from typing_extensions import Annotated
 
-from langchain_core.messages import ToolMessage
-from langchain.tools import tool, ToolRuntime
-from langgraph.types import Command
-
-
-from backend.opendata_api.init_client import client
+from backend.graph.context import get_thread_id
 from backend.modal_runtime.executor import SandboxExecutor
 from backend.modal_runtime.session import session_base_dir
-from backend.graph.context import get_thread_id
+from backend.opendata_api.init_client import client
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -42,7 +41,7 @@ def _create_executor_sync(session_id: str) -> SandboxExecutor:
 
 def get_or_create_executor(session_id: str) -> SandboxExecutor:
     """Get existing executor for session or create new one.
-    
+
     WARNING: If executor doesn't exist, this BLOCKS while creating the sandbox.
     Use async_get_or_create_executor() in async contexts to avoid blocking the event loop.
     """
@@ -60,7 +59,7 @@ def terminate_session_executor(session_id: str) -> None:
 
 async def _check_executor_health(executor: SandboxExecutor) -> bool:
     """Check if the executor's sandbox process is still alive (async version).
-    
+
     Returns True if healthy, False if the process has died.
     """
     try:
@@ -80,7 +79,7 @@ async def _check_executor_health(executor: SandboxExecutor) -> bool:
 
 async def async_get_or_create_executor(session_id: str) -> SandboxExecutor:
     """Async version that creates executor in thread pool to avoid blocking event loop.
-    
+
     Use this in async tools to prevent the Modal sandbox creation from blocking FastAPI.
     Includes health check to recreate executor if the sandbox has died.
     """
@@ -88,7 +87,9 @@ async def async_get_or_create_executor(session_id: str) -> SandboxExecutor:
         executor = _executor_cache[session_id]
         # Check if the sandbox is still alive (async)
         if not await _check_executor_health(executor):
-            logger.warning(f"[SANDBOX] Executor for session {session_id} is unhealthy, recreating...")
+            logger.warning(
+                f"[SANDBOX] Executor for session {session_id} is unhealthy, recreating..."
+            )
             terminate_session_executor(session_id)
         else:
             return executor
@@ -98,14 +99,18 @@ async def async_get_or_create_executor(session_id: str) -> SandboxExecutor:
         if session_id in _executor_cache:
             executor = _executor_cache[session_id]
             if not await _check_executor_health(executor):
-                logger.warning(f"[SANDBOX] Executor for session {session_id} is unhealthy, recreating...")
+                logger.warning(
+                    f"[SANDBOX] Executor for session {session_id} is unhealthy, recreating..."
+                )
                 terminate_session_executor(session_id)
             else:
                 return executor
 
         # Create executor in thread pool to avoid blocking
         loop = asyncio.get_running_loop()
-        executor = await loop.run_in_executor(_modal_thread_pool, _create_executor_sync, session_id)
+        executor = await loop.run_in_executor(
+            _modal_thread_pool, _create_executor_sync, session_id
+        )
         _executor_cache[session_id] = executor
         logger.info(f"[SANDBOX] Created new executor for session {session_id}")
         return executor
@@ -138,13 +143,13 @@ async def execute_code_tool(
     session_id = str(thread_id)
     # Use async version to avoid blocking event loop during sandbox creation
     executor = await async_get_or_create_executor(session_id)
-    
+
     # Run blocking executor.execute() in thread pool with timeout
     loop = asyncio.get_running_loop()
     try:
         result = await asyncio.wait_for(
             loop.run_in_executor(None, executor.execute, code),
-            timeout=120.0  # 2 minute timeout for code execution
+            timeout=120.0,  # 2 minute timeout for code execution
         )
     except asyncio.TimeoutError:
         return Command(
@@ -158,7 +163,9 @@ async def execute_code_tool(
             }
         )
     except Exception as e:
-        logger.error(f"[TOOL] execute_code_tool: execution failed with error: {e}", exc_info=True)
+        logger.error(
+            f"[TOOL] execute_code_tool: execution failed with error: {e}", exc_info=True
+        )
         return Command(
             update={
                 "messages": [
@@ -251,7 +258,7 @@ print(json.dumps(result))
     try:
         check_result = await asyncio.wait_for(
             loop.run_in_executor(None, executor.execute, check_code),
-            timeout=60.0  # 60 second timeout for the check operation
+            timeout=60.0,  # 60 second timeout for the check operation
         )
         print("DEBUG: Executor executed.")
     except asyncio.TimeoutError:
@@ -299,13 +306,16 @@ print(json.dumps(result))
             )
     except (json.JSONDecodeError, KeyError) as e:
         # If check fails, continue to load anyway
-        print(f"Check failed for dataset {dataset_id}; error: {e}. Continuing to load...")
+        print(
+            f"Check failed for dataset {dataset_id}; error: {e}. Continuing to load..."
+        )
 
     # If not, load from S3 or API
     try:
-        import boto3
         import tempfile
         import time
+
+        import boto3
         from botocore.client import Config
 
         print(f"[LOAD_DATASET] Starting load for {dataset_id}")
@@ -315,10 +325,8 @@ print(json.dumps(result))
             "s3",
             region_name=region,
             config=Config(
-                signature_version="s3v4",
-                connect_timeout=10,
-                read_timeout=30
-            )
+                signature_version="s3v4", connect_timeout=10, read_timeout=30
+            ),
         )
         input_bucket = os.getenv("S3_BUCKET")
         if not input_bucket:
@@ -336,7 +344,7 @@ print(json.dumps(result))
         # Try S3 first (input/datasets/{dataset_id}.parquet)
         data_bytes = None
         s3_key = f"input/datasets/{dataset_id}.parquet"
-        
+
         # Create a temp file to store the dataset locally (avoids RAM spikes)
         with tempfile.NamedTemporaryFile(delete=False) as tmp_file:
             temp_path = tmp_file.name
@@ -347,27 +355,25 @@ print(json.dumps(result))
             try:
                 print("Checking S3...")
                 s3.head_object(Bucket=input_bucket, Key=s3_key)
-                
+
                 # Download from S3 to file
                 print("Downloading from S3 to file...")
                 s3.download_file(input_bucket, s3_key, temp_path)
                 print("S3 download complete")
-                
+
                 with open(temp_path, "rb") as f:
                     data_bytes = f.read()
                 print("Read bytes from file into RAM")
-                
+
             except Exception:
                 # Not in S3, download from API to file
                 try:
                     print("Not in S3. Downloading from API to file...")
                     start_dl = time.time()
-                    await client.export_to_file(
-                        dataset_id=dataset_id, path=temp_path
-                    )
+                    await client.export_to_file(dataset_id=dataset_id, path=temp_path)
                     dl_time = time.time() - start_dl
                     print(f"API Download complete in {dl_time:.2f}s")
-                    
+
                     # Read bytes for sandbox injection
                     print("Reading file into RAM...")
                     with open(temp_path, "rb") as f:
@@ -375,7 +381,7 @@ print(json.dumps(result))
                     print(f"Read {len(data_bytes) / 1024 / 1024:.2f} MB into RAM")
 
                     if not data_bytes:
-                         return Command(
+                        return Command(
                             update={
                                 "messages": [
                                     ToolMessage(
@@ -386,8 +392,8 @@ print(json.dumps(result))
                             }
                         )
                 except Exception as api_err:
-                     print(f"API Error: {str(api_err)}")
-                     return Command(
+                    print(f"API Error: {str(api_err)}")
+                    return Command(
                         update={
                             "messages": [
                                 ToolMessage(
@@ -424,18 +430,20 @@ print(json.dumps(result))
         base_dir = session_base_dir(session_id)
         datasets_dir = f"{base_dir}/datasets"
         remote_path = f"{datasets_dir}/{dataset_id}.parquet"
-        
+
         # First ensure the datasets directory exists in the sandbox
         print("[LOAD_DATASET] Creating datasets directory...")
         mkdir_proc = executor.sandbox.exec("mkdir", "-p", datasets_dir)
         mkdir_proc.wait()
-        
+
         # Write file from inside sandbox using cat with stdin
         # This ensures the file is written by the sandbox itself and is immediately visible
         try:
-            print(f"[LOAD_DATASET] Writing {len(data_bytes)} bytes to {remote_path} via sandbox stdin...")
+            print(
+                f"[LOAD_DATASET] Writing {len(data_bytes)} bytes to {remote_path} via sandbox stdin..."
+            )
             write_proc = executor.sandbox.exec("sh", "-c", f"cat > {remote_path}")
-            
+
             # Write in chunks to avoid buffer overflow
             # Use larger chunks for file uploads (256KB) vs code execution (8KB)
             # Larger chunks = fewer network round-trips = much faster for big files
@@ -444,16 +452,18 @@ print(json.dumps(result))
                 chunk = data_bytes[i : i + chunk_size]
                 write_proc.stdin.write(chunk)
                 write_proc.stdin.drain()  # Flush after each chunk to prevent buffer overflow
-            
+
             # Modal StreamWriter uses write_eof() instead of close()
             write_proc.stdin.write_eof()
             write_proc.stdin.drain()  # Ensure EOF is sent
             exit_code = write_proc.wait()
-            
+
             if exit_code != 0:
                 stderr_output = write_proc.stderr.read()
-                raise Exception(f"Write failed with exit code {exit_code}: {stderr_output}")
-            
+                raise Exception(
+                    f"Write failed with exit code {exit_code}: {stderr_output}"
+                )
+
             print(f"[LOAD_DATASET] Successfully written to {remote_path}")
         except Exception as vol_err:
             print(f"[LOAD_DATASET] Volume write error: {vol_err}")
@@ -467,7 +477,7 @@ print(json.dumps(result))
                     ]
                 }
             )
-        
+
         # Now verify the file exists in sandbox and get metadata
         check_code = f"""
 import os
@@ -494,7 +504,7 @@ print(json.dumps(result))
         try:
             verify_result = await asyncio.wait_for(
                 loop.run_in_executor(None, executor.execute, check_code),
-                timeout=120.0  # 2 minute timeout for writing dataset
+                timeout=120.0,  # 2 minute timeout for writing dataset
             )
         except asyncio.TimeoutError:
             return Command(
@@ -507,10 +517,10 @@ print(json.dumps(result))
                     ]
                 }
             )
-        
+
         stdout = verify_result.get("stdout", "").strip()
         stderr = verify_result.get("stderr", "")
-        
+
         if stderr:
             return Command(
                 update={
@@ -522,7 +532,7 @@ print(json.dumps(result))
                     ]
                 }
             )
-        
+
         try:
             result = json.loads(stdout) if stdout else {}
             if "error" in result:
@@ -628,7 +638,7 @@ print(json.dumps(files))
         try:
             result = await asyncio.wait_for(
                 loop.run_in_executor(None, executor.execute, list_code),
-                timeout=30.0  # 30 second timeout for listing datasets
+                timeout=30.0,  # 30 second timeout for listing datasets
             )
         except asyncio.TimeoutError:
             return Command(
@@ -691,6 +701,7 @@ print(json.dumps(files))
     except Exception as e:
         print(f"[LIST_DATASETS] Exception: {e}")
         import traceback
+
         traceback.print_exc()
         return Command(
             update={
@@ -767,7 +778,7 @@ else:
     sha256 = hashlib.sha256(data).hexdigest()
     mime = mimetypes.guess_type(file_path.name)[0] or "application/octet-stream"
     size = len(data)
-    
+
     # Upload to S3 with timeout
     s3_key = f"output/datasets/{{sha256[:2]}}/{{sha256[2:4]}}/{{sha256}}"
     region = "eu-central-1"
@@ -786,7 +797,7 @@ else:
         Body=data,
         ContentType=mime
     )
-    
+
     result = {{
         "name": file_path.name,
         "path": str(file_path),
@@ -803,13 +814,13 @@ print(json.dumps(result))
     # Execute the export code in the sandbox
     # Use async version to avoid blocking event loop during sandbox creation
     executor = await async_get_or_create_executor(session_id)
-    
+
     # Run blocking executor.execute() in thread pool with timeout
     loop = asyncio.get_running_loop()
     try:
         result = await asyncio.wait_for(
             loop.run_in_executor(None, executor.execute, export_code),
-            timeout=120.0  # 2 minute timeout for exporting dataset
+            timeout=120.0,  # 2 minute timeout for exporting dataset
         )
     except asyncio.TimeoutError:
         return Command(

@@ -44,19 +44,19 @@ interface ChatStore {
   addToolDraft: (threadId: string, name: string, input?: any) => void;
   removeToolDraft: (threadId: string, name: string) => void;
   clearToolDrafts: (threadId: string) => void;
-  
+
   // Subagent streaming drafts (data_analyst, report_writer, reviewer)
   subagentDrafts: { threadId: string; agent: string; content: string }[];
   addSubagentDraft: (threadId: string, agent: string, content: string) => void;
   updateSubagentDraft: (threadId: string, agent: string, content: string) => void;
   clearSubagentDrafts: (threadId: string) => void;
   finalizeSubagentDraft: (threadId: string, agent: string) => void;
-  
+
   // Subagent segments (finalized bubbles that persist until backend saves)
   subagentSegments: { threadId: string; agent: string; content: string; id: string; timestamp: number }[];
   clearSubagentSegments: (threadId: string) => void;
   removeSubagentSegments: (threadId: string, agents: string[]) => void;
-  
+
   // Artifact bubbles (separate from tool drafts, persistent)
   artifactBubbles: { threadId: string; toolName: string; artifacts: Artifact[] }[];
   addArtifactBubble: (threadId: string, toolName: string, artifacts: Artifact[]) => void;
@@ -86,7 +86,7 @@ interface ChatStore {
   setCurrentReport: (report: string | null, title?: string | null) => void;
   todos: Todo[];
   setTodos: (todos: Todo[]) => void;
-  
+
   // Analysis quality score (from reviewer)
   analysisScore: number | null;
   analysisStatus: 'pending' | 'approved' | 'rejected' | 'limit_exceeded' | 'end_flow' | null;
@@ -183,7 +183,7 @@ export const useChatStore = create<ChatStore>((set) => ({
     set((state) => ({ toolDrafts: state.toolDrafts.filter((t) => !(t.threadId === threadId && t.name === name)) })),
   clearToolDrafts: (threadId) =>
     set((state) => ({ toolDrafts: state.toolDrafts.filter((t) => t.threadId !== threadId) })),
-  
+
   subagentDrafts: [],
   addSubagentDraft: (threadId, agent, content) =>
     set((state) => {
@@ -222,7 +222,7 @@ export const useChatStore = create<ChatStore>((set) => ({
         subagentDrafts: state.subagentDrafts.filter((s) => !(s.threadId === threadId && s.agent === agent)),
       };
     }),
-  
+
   subagentSegments: [],
   clearSubagentSegments: (threadId) =>
     set((state) => ({ subagentSegments: state.subagentSegments.filter((s) => s.threadId !== threadId) })),
@@ -235,7 +235,7 @@ export const useChatStore = create<ChatStore>((set) => ({
         ),
       };
     }),
-  
+
   artifactBubbles: [],
   addArtifactBubble: (threadId, toolName, artifacts) =>
     set((state) => ({ artifactBubbles: [...state.artifactBubbles, { threadId, toolName, artifacts }] })),
@@ -290,7 +290,7 @@ export const useChatStore = create<ChatStore>((set) => ({
     }),
   todos: [],
   setTodos: (todos) => set({ todos }),
-  
+
   analysisScore: null,
   analysisStatus: null,
   setAnalysisScore: (score) => set({ analysisScore: score }),
@@ -341,4 +341,3 @@ export const useChatStore = create<ChatStore>((set) => ({
     }));
   },
 }));
-

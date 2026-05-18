@@ -30,7 +30,7 @@ export function ThreadSelector({ onCollapse }: ThreadSelectorProps) {
   const defaultConfig = useChatStore((state) => state.defaultConfig);
   const setCurrentReport = useChatStore((state) => state.setCurrentReport);
   const setTodos = useChatStore((state) => state.setTodos);
-  
+
   // Bulk selection
   const selectedThreadIds = useChatStore((state) => state.selectedThreadIds);
   const toggleThreadSelection = useChatStore((state) => state.toggleThreadSelection);
@@ -65,7 +65,7 @@ export function ThreadSelector({ onCollapse }: ThreadSelectorProps) {
     // Only run if threads are loaded and no thread is selected
     // Don't auto-select if we already have a thread selected (preserves selection when navigating)
     if (threads.length === 0 || currentThreadId) return;
-    
+
     // Select the most recent thread (first in list)
     const mostRecentThread = threads[0];
     if (mostRecentThread) {
@@ -80,10 +80,10 @@ export function ThreadSelector({ onCollapse }: ThreadSelectorProps) {
   useEffect(() => {
     // Only run once after initial load if no threads exist
     if (threads.length > 0 || currentThreadId || isCreating || hasAttemptedAutoCreate.current) return;
-    
+
     // Mark that we've attempted auto-create to prevent multiple calls
     hasAttemptedAutoCreate.current = true;
-    
+
     async function autoCreateThread() {
       setIsCreating(true);
       try {
@@ -99,7 +99,7 @@ export function ThreadSelector({ onCollapse }: ThreadSelectorProps) {
         setIsCreating(false);
       }
     }
-    
+
     autoCreateThread();
   }, [threads.length, currentThreadId, isCreating, userId, addThread, setCurrentThreadId, setContextUsage, defaultConfig.context_window]);
 
@@ -166,7 +166,7 @@ export function ThreadSelector({ onCollapse }: ThreadSelectorProps) {
       const state = await getThreadState(threadId);
       setContextUsage(state.token_count, state.context_window);
       setTodos(state.todos || []);
-      
+
       // Load report if available
       if (state.report_content && state.report_title) {
         setCurrentReport(state.report_content, state.report_title);
@@ -259,7 +259,7 @@ export function ThreadSelector({ onCollapse }: ThreadSelectorProps) {
     try {
       await Promise.all(Array.from(selectedThreadIds).map((id) => archiveThread(id)));
       // Update threads to show as archived
-      setThreads(threads.map((t) => 
+      setThreads(threads.map((t) =>
         selectedThreadIds.has(t.id) ? { ...t, archived_at: new Date().toISOString() } : t
       ));
       clearThreadSelection();
@@ -292,15 +292,15 @@ export function ThreadSelector({ onCollapse }: ThreadSelectorProps) {
           >
             <Menu size={16} className="text-gray-500 dark:text-slate-400 group-hover:text-gray-700 dark:group-hover:text-slate-200 transition-colors" />
           </button>
-          
+
           {/* Thread selector */}
           <button
             onClick={() => setIsOpen(!isOpen)}
             className="flex items-center gap-2 px-3 py-1.5 rounded-xl border border-gray-200 dark:border-slate-700 hover:bg-gray-50 dark:hover:bg-slate-700 transition-all duration-200 min-w-0 shadow-sm hover:shadow-md flex-1"
           >
             <MessageCircle size={16} className="text-gray-500 dark:text-slate-400 flex-shrink-0" />
-            <AnimatedTitle 
-              title={currentThread?.title || 'Select a thread'} 
+            <AnimatedTitle
+              title={currentThread?.title || 'Select a thread'}
               className="truncate text-sm font-medium text-gray-700 dark:text-slate-200"
               duration={300}
             />
@@ -318,7 +318,7 @@ export function ThreadSelector({ onCollapse }: ThreadSelectorProps) {
           >
             <Plus size={16} className="text-gray-500 dark:text-slate-400" />
           </button>
-          
+
           <button
             onClick={toggleTheme}
             className="p-2 rounded-xl border border-gray-200 dark:border-slate-700 hover:bg-gray-50 dark:hover:bg-slate-700 transition-all duration-200 shadow-sm hover:shadow-md"
@@ -333,7 +333,7 @@ export function ThreadSelector({ onCollapse }: ThreadSelectorProps) {
 
           {/* Authentication */}
           {isSignedIn ? (
-            <UserButton 
+            <UserButton
               appearance={{
                 elements: {
                   avatarBox: "w-8 h-8"
@@ -418,7 +418,7 @@ export function ThreadSelector({ onCollapse }: ThreadSelectorProps) {
                   </button>
                 )}
               </div>
-              
+
               <div className="py-2">
                 {threads.map((thread) => (
                 <div
@@ -479,7 +479,7 @@ export function ThreadSelector({ onCollapse }: ThreadSelectorProps) {
                         </span>
                       )}
                     </button>
-                      
+
                       {/* Action buttons - show on hover (hide in bulk mode) */}
                       {!bulkMode && (
                         <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -517,7 +517,7 @@ export function ThreadSelector({ onCollapse }: ThreadSelectorProps) {
               </div>
             </>
           )}
-          
+
           {/* Create new thread button */}
           <div className="border-t border-gray-200 dark:border-slate-700 p-3">
             <button
@@ -589,5 +589,3 @@ export function ThreadSelector({ onCollapse }: ThreadSelectorProps) {
     </div>
   );
 }
-
-

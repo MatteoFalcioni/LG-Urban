@@ -1,8 +1,10 @@
-from tavily import TavilyClient
 import os
+
 from langchain_core.tools import tool
+from tavily import TavilyClient
 
 # ---------- Internet Search Tool ----------
+
 
 @tool
 def internet_search(query):

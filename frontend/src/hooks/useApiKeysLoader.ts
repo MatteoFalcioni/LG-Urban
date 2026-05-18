@@ -14,7 +14,7 @@ export function useApiKeysLoader() {
   useEffect(() => {
     async function loadApiKeys() {
       if (!userId) return;
-      
+
       try {
         const keys = await getUserApiKeys(userId);
         // Update store with masked key (already masked from the API)
@@ -32,4 +32,3 @@ export function useApiKeysLoader() {
     loadApiKeys();
   }, [userId, setApiKeys]);
 }
-

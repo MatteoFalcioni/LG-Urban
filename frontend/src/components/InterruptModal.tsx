@@ -13,15 +13,15 @@ interface InterruptModalProps {
 
 export function InterruptModal({ interruptData, onResume, onCancel }: InterruptModalProps) {
   const [editInstructions, setEditInstructions] = useState('');
-  
+
   // Detect which interrupt this is based on the data structure
   const isWriteReportApproval =
     (interruptData &&
       typeof interruptData === 'object' &&
       interruptData.type === 'handoff_request' &&
       interruptData.agent === 'report_writer') ||
-    (typeof interruptData === 'string' && 
-      (interruptData.includes('write a report') || 
+    (typeof interruptData === 'string' &&
+      (interruptData.includes('write a report') ||
        interruptData.includes('report_writer') ||
        interruptData.toLowerCase().includes('do you approve')));
 
@@ -30,13 +30,13 @@ export function InterruptModal({ interruptData, onResume, onCancel }: InterruptM
       ? interruptData
       : interruptData?.message ||
         'The supervisor wants to hand off to the report writer. Do you approve?';
-  
+
   const isReportReview = interruptData?.report && interruptData?.question;
-  
+
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
       <div className="bg-white dark:bg-slate-800 rounded-lg shadow-xl max-w-2xl w-full max-h-[80vh] overflow-hidden flex flex-col">
-        
+
         {/* First Interrupt: Report Writing Approval */}
         {isWriteReportApproval && (
           <>
@@ -75,7 +75,7 @@ export function InterruptModal({ interruptData, onResume, onCancel }: InterruptM
             </div>
           </>
         )}
-        
+
         {/* Second Interrupt: Report Review/Edit */}
         {isReportReview && (
           <>
@@ -94,7 +94,7 @@ export function InterruptModal({ interruptData, onResume, onCancel }: InterruptM
                   {interruptData.report}
                 </pre>
               </div>
-              
+
               {/* Edit instructions input */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-2">
@@ -138,7 +138,7 @@ export function InterruptModal({ interruptData, onResume, onCancel }: InterruptM
             </div>
           </>
         )}
-        
+
         {/* Fallback for unknown interrupt type */}
         {!isWriteReportApproval && !isReportReview && (
           <>
@@ -175,5 +175,3 @@ export function InterruptModal({ interruptData, onResume, onCancel }: InterruptM
     </div>
   );
 }
-
-

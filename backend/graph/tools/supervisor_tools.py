@@ -1,10 +1,11 @@
 from typing import Annotated
-from langchain.tools import tool, ToolRuntime
-from langchain_core.messages import ToolMessage, HumanMessage
+
+from langchain.tools import ToolRuntime, tool
+from langchain_core.messages import HumanMessage, ToolMessage
 from langgraph.types import Command, interrupt
 
 # ------ developer note -------
-# NOTE: we are considering 'an analysis' as one conversation turn: user -> graph -> user. 
+# NOTE: we are considering 'an analysis' as one conversation turn: user -> graph -> user.
 # This may be an oversimplification:
 # what if the user is not satisfied with an operation performed by the analyst and wants to change a specific action?
 # Like, say, remake a plot. The analyst loses sources, code and todos when this new task is assigned, but the 'analysys' is still the same.
@@ -13,17 +14,18 @@ from langgraph.types import Command, interrupt
 # -----------------------------
 
 # ------ developer note -------
-# NOTE: When we use handoff tools, we pass the state updates as well in the Command. 
+# NOTE: When we use handoff tools, we pass the state updates as well in the Command.
 # That is fine because we want to add always a tool message, but there is a problem with multi-turn conversations:
 # if we pass state as is in the handoff, after having modified state previously, it will not be reset - of course, that's how LG is supposed to work: be stateful.
 # but this means then that we may want to perform some additional state management in the handoffs, like resetting state values.
-# (!) We will only do it for the analyst because it's the first agent that is hit in our workflow 
+# (!) We will only do it for the analyst because it's the first agent that is hit in our workflow
 # -----------------------------
 
 
 # === Handoff Tools ===
 # NOTE: these are structured with graph.PARENT because we do not have a supervisor node right now.
 # That means that the subagents are considered by langgraph as **subgraphs** and therefore we need Command.PARENT in the handoff.
+
 
 # helper function to create handoff tool
 def create_handoff_tool(
@@ -38,7 +40,6 @@ def create_handoff_tool(
         task: Annotated[str, "The task that the subagent should perform"],
         runtime: ToolRuntime,
     ) -> Command:
-
         tool_msg = ToolMessage(
             content=f"Successfully transferred to {agent_name}",
             tool_call_id=runtime.tool_call_id,
@@ -56,6 +57,7 @@ def create_handoff_tool(
 
     return handoff_tool
 
+
 # === Handoff Tools with Human In The Loop ===
 def create_handoff_tool_HITL(*, agent_name: str, description: str | None = None):
     name = f"transfer_to_{agent_name}"
@@ -66,7 +68,6 @@ def create_handoff_tool_HITL(*, agent_name: str, description: str | None = None)
         task: Annotated[str, "The task that the subagent should perform"],
         runtime: ToolRuntime,
     ) -> Command:
-
         usr_response = interrupt(
             value=f"The agent supervisor wants to call the {agent_name} to perform the following task: *{task}*\nDo you approve?"
         )
@@ -84,9 +85,11 @@ def create_handoff_tool_HITL(*, agent_name: str, description: str | None = None)
                     ]
                 }
             )
-        
+
         if not isinstance(usr_response, dict):
-            error_msg = f"Resume value must be a dict, got {type(usr_response)}: {usr_response}"
+            error_msg = (
+                f"Resume value must be a dict, got {type(usr_response)}: {usr_response}"
+            )
             return Command(
                 update={
                     "messages": [
@@ -97,8 +100,8 @@ def create_handoff_tool_HITL(*, agent_name: str, description: str | None = None)
                     ]
                 }
             )
-        
-        if 'decision' not in usr_response:
+
+        if "decision" not in usr_response:
             error_msg = f"Resume value missing 'decision' key. Got: {usr_response}"
             return Command(
                 update={
@@ -111,7 +114,7 @@ def create_handoff_tool_HITL(*, agent_name: str, description: str | None = None)
                 }
             )
 
-        if usr_response['decision'] == "accept":
+        if usr_response["decision"] == "accept":
             goto = agent_name
             tool_msg = [
                 ToolMessage(
@@ -125,15 +128,15 @@ def create_handoff_tool_HITL(*, agent_name: str, description: str | None = None)
                 )
             ]
             msgs = tool_msg + task_msg
-        elif usr_response['decision'] == 'reject':
+        elif usr_response["decision"] == "reject":
             goto = "supervisor"
             msgs = [
                 ToolMessage(
                     content=f"Routing to {agent_name} was rejected by the user.",
-                    tool_call_id=runtime.tool_call_id
+                    tool_call_id=runtime.tool_call_id,
                 )
             ]
-        else: 
+        else:
             error_msg = f"Invalid user response: {usr_response['decision']}"
             return Command(
                 update={
@@ -159,7 +162,6 @@ def create_handoff_tool_HITL(*, agent_name: str, description: str | None = None)
 
 # === Handoff Tool with state management for data analyst agent ===
 def create_handoff_to_data_analyst():
-
     # hardcoded for data analyst agent
     name = "transfer_to_data_analyst"
     description = "Assign task to the data analyst agent."
@@ -192,15 +194,19 @@ def create_handoff_to_data_analyst():
         return Command(
             goto="data_analyst",
             update={
-                "messages": state["messages"] + [tool_msg] + [task_msg],  # do not reset: msgs, reports, analysis comments and reroute_count
+                "messages": state["messages"]
+                + [tool_msg]
+                + [
+                    task_msg
+                ],  # do not reset: msgs, reports, analysis comments and reroute_count
                 "completeness_score": 0,
                 "relevancy_score": 0,
-                "final_score": 0, 
-                "todos" : [],  
-                "code_logs" : [],
-                "code_logs_chunks" : [],
-                "sources" : []  
-                },
+                "final_score": 0,
+                "todos": [],
+                "code_logs": [],
+                "code_logs_chunks": [],
+                "sources": [],
+            },
             graph=Command.PARENT,
         )
 

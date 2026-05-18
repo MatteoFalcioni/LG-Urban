@@ -1,8 +1,8 @@
-import json
-import sys
-import os
 import hashlib
+import json
 import mimetypes
+import os
+import sys
 from contextlib import redirect_stderr, redirect_stdout
 from io import StringIO
 from pathlib import Path
@@ -89,16 +89,14 @@ def driver_program():
         # Import boto3 only when needed to avoid credential issues in CI
         import boto3
         from botocore.client import Config
-        
+
         region = os.getenv("AWS_REGION", "eu-central-1")
         s3_client = boto3.client(
             "s3",
             region_name=region,
             config=Config(
-                signature_version="s3v4",
-                connect_timeout=10,
-                read_timeout=30
-            )
+                signature_version="s3v4", connect_timeout=10, read_timeout=30
+            ),
         )
         s3_bucket = os.getenv("S3_BUCKET", "lg-urban-prod")
     else:
@@ -146,21 +144,21 @@ def driver_program():
             artifacts = []
             try:
                 import signal
-                
+
                 def timeout_handler(signum, frame):
                     raise TimeoutError("Artifact scan timed out")
-                
+
                 # Set 10 second timeout for artifact scanning
                 signal.signal(signal.SIGALRM, timeout_handler)
                 signal.alarm(10)
-                
+
                 artifacts = scan_and_upload_artifacts(
                     processed_artifacts,
                     s3_bucket,
                     s3_client,
                     disable_upload=disable_s3_upload,
                 )
-                
+
                 signal.alarm(0)  # Cancel alarm if completed successfully
             except (TimeoutError, Exception):
                 # If artifact scan times out or fails, continue without artifacts

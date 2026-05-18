@@ -20,7 +20,7 @@ export function ModelSelector() {
   const currentThreadId = useChatStore((state) => state.currentThreadId);
   const defaultConfigModel = useChatStore((state) => state.defaultConfig.model);
   const defaultConfig = useChatStore((state) => state.defaultConfig);
-  
+
   const [isOpen, setIsOpen] = useState(false);
   const [currentModel, setCurrentModel] = useState<string>('claude-sonnet-4.6');
   const [isLoading, setIsLoading] = useState(false);
@@ -76,7 +76,7 @@ export function ModelSelector() {
   // Reload model when page becomes visible (e.g., returning from settings) - only if thread exists
   useEffect(() => {
     if (!currentThreadId) return; // Skip if no thread
-    
+
     function handleVisibilityChange() {
       if (document.visibilityState === 'visible') {
         loadModel();
@@ -91,7 +91,7 @@ export function ModelSelector() {
   // Reload model when window gains focus (e.g., switching tabs back) - only if thread exists
   useEffect(() => {
     if (!currentThreadId) return; // Skip if no thread
-    
+
     function handleFocus() {
       loadModel();
     }
@@ -161,8 +161,8 @@ export function ModelSelector() {
         }}
       >
         <span>{currentModelLabel}</span>
-        <ChevronUp 
-          size={12} 
+        <ChevronUp
+          size={12}
           className={`transition-transform duration-200 ${isOpen ? '' : 'rotate-180'}`}
         />
       </button>
@@ -197,4 +197,3 @@ export function ModelSelector() {
     </div>
   );
 }
-

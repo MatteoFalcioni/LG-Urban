@@ -77,4 +77,3 @@ See `RDS-CONNECTION-GUIDE.md` for complete details, troubleshooting, and archite
 - **User:** postgres
 - **Bastion:** 3.122.52.220
 - **RDS:** lg-urban-prod1.cji2iikug9u5.eu-central-1.rds.amazonaws.com
-

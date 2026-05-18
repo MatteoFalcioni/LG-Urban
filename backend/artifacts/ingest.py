@@ -4,6 +4,7 @@ S3-only artifact ingestion: insert metadata for files uploaded by Modal.
 """
 
 from __future__ import annotations
+
 import uuid
 from typing import Dict, Optional
 

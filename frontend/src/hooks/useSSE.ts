@@ -34,7 +34,7 @@ export function useSSE(options: UseSSEOptions) {
 
   /**
    * Send a message and stream the assistant response via SSE.
-   * 
+   *
    * @param threadId - Target thread ID
    * @param messageId - Client-generated UUID for idempotency
    * @param content - Message content (should have {text: string})
@@ -157,7 +157,7 @@ export function useSSE(options: UseSSEOptions) {
 
   /**
    * Resume a thread after an interrupt.
-   * 
+   *
    * @param threadId - Target thread ID
    * @param resumeValue - Resume data (string like 'accept'/'reject' for supervisor HITL, or object like {type: 'accept'} for other interrupts)
    */
@@ -286,7 +286,7 @@ export function useSSE(options: UseSSEOptions) {
 
   /**
    * Continue execution from the last checkpoint after user stopped.
-   * 
+   *
    * @param threadId - Target thread ID
    */
   const continueThread = useCallback(
@@ -406,4 +406,3 @@ export function useSSE(options: UseSSEOptions) {
 
   return { sendMessage, resumeThread, stopStream, continueThread, isStreaming, canContinue };
 }
-

@@ -22,7 +22,7 @@ export function ApiKeyWarning() {
         setIsChecking(false);
         return;
       }
-      
+
       // Check if OpenRouter key exists in the store
       const hasKey = apiKeys.openrouter;
         setShowWarning(!hasKey);
@@ -50,7 +50,7 @@ export function ApiKeyWarning() {
 
         {/* Message */}
         <p className="text-gray-600 dark:text-slate-300 mb-6">
-          To use this application, you need to provide an OpenRouter API key. 
+          To use this application, you need to provide an OpenRouter API key.
           Your key is encrypted and stored securely.
         </p>
 
@@ -66,9 +66,9 @@ export function ApiKeyWarning() {
         {/* Info text */}
         <p className="text-sm text-gray-500 dark:text-slate-400 mt-4 text-center">
           Get your free API key at{' '}
-          <a 
-            href="https://openrouter.ai/keys" 
-            target="_blank" 
+          <a
+            href="https://openrouter.ai/keys"
+            target="_blank"
             rel="noopener noreferrer"
             className="text-blue-500 hover:text-blue-600 underline"
           >
@@ -79,4 +79,3 @@ export function ApiKeyWarning() {
     </div>
   );
 }
-

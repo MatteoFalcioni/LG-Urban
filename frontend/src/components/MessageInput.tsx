@@ -36,7 +36,7 @@ export function MessageInput() {
   const setAnalysisScore = useChatStore((state) => state.setAnalysisScore);
   const setAnalysisStatus = useChatStore((state) => state.setAnalysisStatus);
   const apiKeys = useChatStore((state) => state.apiKeys);
-  
+
   const [input, setInput] = useState('');
   const [interruptData, setInterruptData] = useState<any>(null); // Track graph interrupts (HITL)
   const streamingRef = useRef(''); // Accumulate streaming tokens (mirror to avoid stale closure on onDone)
@@ -50,12 +50,12 @@ export function MessageInput() {
   const clearSubagentSegments = useChatStore((state) => state.clearSubagentSegments);
   const addArtifactBubble = useChatStore((state) => state.addArtifactBubble);
   const removeSubagentSegments = useChatStore((state) => state.removeSubagentSegments);
-  
+
   // Track the currently active agent (last agent that received tokens)
   const activeAgentRef = useRef<string | null>(null);
   const clearArtifactBubbles = useChatStore((state) => state.clearArtifactBubbles);
   const setContextUsage = useChatStore((state) => state.setContextUsage);
-  
+
   // Check if user has OpenRouter API key configured
   const hasApiKeys = Boolean(apiKeys.openrouter);
 
@@ -65,7 +65,7 @@ export function MessageInput() {
       // Fetch current state, objectives, and report for the thread
       getThreadState(currentThreadId).then((state) => {
         setTodos(state.todos || []);
-        
+
         // Load full reports list (all reports in state)
         const reportsMap = state.reports || {};
         const entries = Object.entries(reportsMap).map(([title, content]) => ({
@@ -91,7 +91,7 @@ export function MessageInput() {
         } else {
           setCurrentReport(null, null);
         }
-        
+
         // Load score if available (from reviewer)
         setAnalysisScore(state.final_score ?? null);
         setAnalysisStatus(state.analysis_status ?? null);
@@ -131,7 +131,7 @@ export function MessageInput() {
   useEffect(() => {
     adjustTextareaHeight();
   }, [input, adjustTextareaHeight]);
-  
+
   // SSE hook with handlers for streaming events
   const { sendMessage, resumeThread, stopStream, continueThread, isStreaming, canContinue } = useSSE({
     onThinking: (content) => {
@@ -154,7 +154,7 @@ export function MessageInput() {
       if (currentThreadId) {
         // Track the active agent
         activeAgentRef.current = agent;
-        
+
         // Get existing content or start fresh
         const existing = useChatStore.getState().subagentDrafts.find(
           (s) => s.threadId === currentThreadId && s.agent === agent
@@ -181,7 +181,7 @@ export function MessageInput() {
         setTimeout(() => {
           removeToolDraft(currentThreadId, name);
         }, 1000); // 1 second minimum display time
-        
+
         // Show artifacts immediately during streaming
         if (artifacts && artifacts.length > 0) {
           addArtifactBubble(currentThreadId, name, artifacts);
@@ -232,20 +232,20 @@ export function MessageInput() {
       streamingRef.current = '';
       clearDraft();
       clearThinkingBlock();
-      
+
       // Finalize any remaining subagent drafts before clearing
       if (currentThreadId && activeAgentRef.current) {
         finalizeSubagentDraft(currentThreadId, activeAgentRef.current);
       }
       activeAgentRef.current = null; // Reset active agent
-      
+
       // Clear any remaining tool drafts (handles failed tools that didn't send tool_end)
       if (currentThreadId) {
         clearToolDrafts(currentThreadId);
         clearSubagentDrafts(currentThreadId);
         // Don't clear segments here - we'll keep them visible since backend only saves one message per agent
       }
-      
+
       // Refetch all messages from DB to get the correct order (supervisor + subagents)
       // Backend saves all messages (supervisor + subagents) so we need to refetch to see them all
       if (currentThreadId) {
@@ -255,19 +255,19 @@ export function MessageInput() {
             // Refetch thread state to get updated todos (persisted in graph state)
             const state = await getThreadState(currentThreadId);
             setTodos(state.todos || []);
-            
+
             // Load report if available
             if (state.report_content && state.report_title) {
               setCurrentReport(state.report_content, state.report_title);
             }
-            
+
             // Load score if available (from reviewer)
           setAnalysisScore(state.final_score ?? null);
           setAnalysisStatus(state.analysis_status ?? null);
-            
+
             // Load code logs from last analysis
             setCodeLogs(state.code_logs || []);
-            
+
             // Load all reports
             const reportsList = Object.entries(state.reports || {}).map(([title, content]) => ({
               title,
@@ -280,13 +280,13 @@ export function MessageInput() {
               return 0;
             });
             setReports(sortedReports);
-            
+
             const fetchedMessages = await listMessages(currentThreadId);
             const chronologicalMessages = [...fetchedMessages].reverse();
-            
+
             // Update store with fresh messages from DB (chronological order)
             setMessages(chronologicalMessages);
-            
+
             // Remove stale frontend segments for agents that now have saved segments
             const segmentAgents = Array.from(
               new Set(
@@ -303,12 +303,12 @@ export function MessageInput() {
             if (segmentAgents.length > 0) {
               removeSubagentSegments(currentThreadId, segmentAgents);
             }
-            
+
             // Check if ANY message in the thread has artifacts
             const allArtifacts = chronologicalMessages
               .filter(m => m.artifacts && m.artifacts.length > 0)
               .flatMap(m => m.artifacts || []);
-            
+
             if (allArtifacts.length > 0) {
               // Artifacts are now in store - safe to clear bubbles
               // The de-duplicator in ArtifactDisplay will show them from messages
@@ -316,7 +316,7 @@ export function MessageInput() {
             } else {
               console.log('No artifacts in DB yet, keeping bubbles visible');
             }
-            
+
             // Note: We keep subagentSegments visible because the backend only saves
             // one aggregated message per agent, but we want to show all the segments
             // that were separated by tool calls. The segments will be cleared when
@@ -336,7 +336,7 @@ export function MessageInput() {
       streamingRef.current = '';
       clearDraft();
       clearThinkingBlock();
-      
+
       // Clear any hanging tool drafts when stream errors out
       if (currentThreadId) {
         clearToolDrafts(currentThreadId);
@@ -352,7 +352,7 @@ export function MessageInput() {
 
     // Clear any finalized subagent segments from previous turns
     clearSubagentSegments(currentThreadId);
-    
+
     // Continue execution from last checkpoint
     await continueThread(currentThreadId);
   }
@@ -362,7 +362,7 @@ export function MessageInput() {
    */
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    
+
     if (!input.trim() || isStreaming) return;
 
     const userText = input.trim();
@@ -393,7 +393,7 @@ export function MessageInput() {
     if (threadId) {
       clearSubagentSegments(threadId);
     }
-    
+
     // Add user message to UI immediately (optimistic)
     const userMessageId = crypto.randomUUID();
     const userMsg: Message = {
@@ -426,18 +426,18 @@ export function MessageInput() {
               }
             }}
             placeholder={
-              !hasApiKeys 
-                ? "Please add API keys in Settings to start chatting" 
-                : currentThreadId 
-                  ? "Type a message..." 
+              !hasApiKeys
+                ? "Please add API keys in Settings to start chatting"
+                : currentThreadId
+                  ? "Type a message..."
                   : "Create a new thread to start chatting"
             }
             rows={1}
             disabled={isStreaming || !hasApiKeys}
             className="w-full px-4 py-3 pr-16 pb-14 rounded-xl focus:outline-none focus:ring-2 focus:border-transparent resize-none disabled:opacity-50 transition-all duration-200 text-sm overflow-hidden"
-            style={{ 
-              border: '1px solid var(--border)', 
-              backgroundColor: 'var(--bg-secondary)', 
+            style={{
+              border: '1px solid var(--border)',
+              backgroundColor: 'var(--bg-secondary)',
               color: 'var(--text-primary)',
               minHeight: '48px',
               maxHeight: '200px'
@@ -462,8 +462,8 @@ export function MessageInput() {
             type="button"
             onClick={stopStream}
             className="px-4 py-3 rounded-xl transition-all duration-200 flex items-center gap-2 shadow-sm hover:shadow-md"
-            style={{ 
-              backgroundColor: 'var(--user-message-bg)', 
+            style={{
+              backgroundColor: 'var(--user-message-bg)',
               color: 'var(--user-message-text)'
             }}
             title="Stop execution"
@@ -478,8 +478,8 @@ export function MessageInput() {
             type="button"
             onClick={handleContinue}
             className="px-4 py-3 rounded-xl transition-all duration-200 flex items-center gap-2 shadow-sm hover:shadow-md"
-            style={{ 
-              backgroundColor: 'var(--user-message-bg)', 
+            style={{
+              backgroundColor: 'var(--user-message-bg)',
               color: 'var(--user-message-text)'
             }}
             title="Continue from where you stopped"
@@ -494,8 +494,8 @@ export function MessageInput() {
             type="submit"
             disabled={!input.trim() || !currentThreadId || !hasApiKeys}
             className="px-4 py-3 rounded-xl transition-all duration-200 flex items-center gap-2 shadow-sm hover:shadow-md disabled:shadow-none disabled:cursor-not-allowed"
-            style={{ 
-              backgroundColor: 'var(--user-message-bg)', 
+            style={{
+              backgroundColor: 'var(--user-message-bg)',
               color: 'var(--user-message-text)',
               opacity: (!input.trim() || !currentThreadId || !hasApiKeys) ? 0.5 : 1
             }}
@@ -509,7 +509,7 @@ export function MessageInput() {
       {/* Inline typing now handled in MessageList; no bottom preview */}
 
       {/* Active tool indicators are now rendered inline in the chat list */}
-      
+
       {/* Interrupt Modal - Show when graph is interrupted for HITL */}
       {interruptData && currentThreadId && (
         <InterruptModal
@@ -524,4 +524,3 @@ export function MessageInput() {
     </form>
   );
 }
-

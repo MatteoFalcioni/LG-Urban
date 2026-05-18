@@ -19,14 +19,14 @@ from datetime import datetime  # noqa: E402
 from typing import Any, Optional  # noqa: E402
 
 from sqlalchemy import (  # noqa: E402
-    String,
     DateTime,
     ForeignKey,
-    text,
     Index,
+    String,
     Text,
+    text,
 )
-from sqlalchemy.dialects.postgresql import UUID, JSONB  # noqa: E402
+from sqlalchemy.dialects.postgresql import JSONB, UUID  # noqa: E402
 from sqlalchemy.orm import (  # noqa: E402
     DeclarativeBase,
     Mapped,

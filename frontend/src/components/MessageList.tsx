@@ -54,10 +54,10 @@ export function MessageList() {
   // Check if user is near bottom (to show/hide scroll button)
   const handleScroll = useCallback(() => {
     if (!scrollContainerRef.current) return;
-    
+
     const { scrollTop, scrollHeight, clientHeight } = scrollContainerRef.current;
     const distanceFromBottom = scrollHeight - scrollTop - clientHeight;
-    
+
     // Show button if more than 100px from bottom
     setShowScrollButton(distanceFromBottom > 100);
   }, []);
@@ -90,9 +90,9 @@ export function MessageList() {
 
   // Extract segments from saved messages (those with segment_index in meta)
   const savedSegments = messages
-    .filter(msg => 
-      msg.role === 'assistant' && 
-      msg.meta?.agent && 
+    .filter(msg =>
+      msg.role === 'assistant' &&
+      msg.meta?.agent &&
       msg.meta?.segment_index !== undefined &&
       msg.thread_id === currentThreadId
     )
@@ -103,7 +103,7 @@ export function MessageList() {
       }
       return (a.meta?.segment_index || 0) - (b.meta?.segment_index || 0);
     });
-  
+
   // Parse user message ID from segment message_id
   // Format: "subagent:{user_message_id}:{agent}:segment:{index}"
   const parseUserMessageId = (messageId: string | null | undefined): string | null => {
@@ -111,7 +111,7 @@ export function MessageList() {
     const match = messageId.match(/^subagent:([^:]+):/);
     return match ? match[1] : null;
   };
-  
+
   // Combine frontend segments (during streaming) with saved segments (from DB)
   const currentSegments = subagentSegments
     .filter((s) => s.threadId === currentThreadId)
@@ -122,7 +122,7 @@ export function MessageList() {
       timestamp: s.timestamp || Date.now(),
       userMessageId: null, // Frontend segments don't have message_id yet
     }));
-  
+
   const savedSegmentEntries = savedSegments.map((msg) => ({
     id: msg.id,
     agent: msg.meta!.agent!,
@@ -130,7 +130,7 @@ export function MessageList() {
     timestamp: msg.created_at ? new Date(msg.created_at).getTime() : Date.now(),
     userMessageId: parseUserMessageId(msg.message_id), // Extract user message ID from message_id
   }));
-  
+
   // Group segments by user message ID
   const segmentsByUserMessage = new Map<string, typeof savedSegmentEntries>();
   for (const seg of savedSegmentEntries) {
@@ -141,33 +141,33 @@ export function MessageList() {
       segmentsByUserMessage.get(seg.userMessageId)!.push(seg);
     }
   }
-  
+
   // For frontend segments (during streaming), we'll insert them at the end
   // They'll be cleared once backend saves them
   const allSegments = [...savedSegmentEntries, ...currentSegments];
   const agentsWithSegments = new Set(allSegments.map((seg) => seg.agent));
-  
+
   // Filter messages: hide tool messages and subagent messages replaced by segments
   const filteredMessages = messages.filter((msg) => {
     if (msg.role === 'tool') return false;
-    
+
     if (msg.role === 'assistant' && msg.meta?.agent) {
       // Hide saved segment messages (they're rendered as SubagentBubble)
       if (msg.meta?.segment_index !== undefined) return false;
       // Hide aggregated subagent messages if we have segments for that agent
       if (agentsWithSegments.has(msg.meta.agent)) return false;
     }
-    
+
     return true;
   });
-  
+
   // Build timeline: insert segments after their corresponding user message
   const timeline: Array<{ type: 'message'; id: string; data: Message } | { type: 'segment'; id: string; data: { agent: string; content: string } }> = [];
-  
+
   for (let i = 0; i < filteredMessages.length; i++) {
     const msg = filteredMessages[i];
     timeline.push({ type: 'message', id: msg.id, data: msg });
-    
+
     if (msg.role === 'user' && msg.message_id) {
       // Insert segments that belong to this user message
       const turnSegments = segmentsByUserMessage.get(msg.message_id) || [];
@@ -180,7 +180,7 @@ export function MessageList() {
       }
     }
   }
-  
+
   // Insert frontend segments (during streaming) at the end
   // These don't have userMessageId yet, so they appear after all messages
   for (const seg of currentSegments) {
@@ -193,7 +193,7 @@ export function MessageList() {
 
   return (
     <div className="relative h-full">
-      <div 
+      <div
         ref={scrollContainerRef}
         onScroll={handleScroll}
         className="space-y-4 p-4 h-full overflow-y-auto"
@@ -216,7 +216,7 @@ export function MessageList() {
             />
           );
         })}
-        
+
         {/* Thinking block (Claude extended thinking) */}
         {thinkingBlock && thinkingBlock.threadId === currentThreadId && (
           <ThinkingBlock content={thinkingBlock.content} />
@@ -244,7 +244,7 @@ export function MessageList() {
             </div>
           </div>
         )}
-        
+
         {/* Invisible anchor for scroll target */}
         <div ref={messagesEndRef} />
       </div>
@@ -282,9 +282,9 @@ function ToolCallBubble({ name, input }: ToolCallBubbleProps) {
   if (isLoadDataset && datasetId) {
     return (
       <div className="flex gap-3 items-start">
-        <div 
+        <div
           className="flex-1 rounded-xl px-4 py-3 shadow-sm backdrop-blur-sm border transition-all"
-          style={{ 
+          style={{
             backgroundColor: 'color-mix(in srgb, var(--bg-secondary) 60%, transparent)',
             borderColor: 'color-mix(in srgb, var(--border) 50%, transparent)',
           }}
@@ -307,13 +307,13 @@ function ToolCallBubble({ name, input }: ToolCallBubbleProps) {
 
   // Default behavior for other tools
   return (
-    <div 
+    <div
       className="flex gap-3 items-start cursor-pointer transition-all duration-200 hover:opacity-80"
       onClick={() => setIsExpanded(!isExpanded)}
     >
-      <div 
+      <div
         className="flex-1 rounded-xl px-4 py-3 shadow-sm backdrop-blur-sm border transition-all"
-        style={{ 
+        style={{
           backgroundColor: 'color-mix(in srgb, var(--bg-secondary) 60%, transparent)',
           borderColor: 'color-mix(in srgb, var(--border) 50%, transparent)',
         }}
@@ -322,7 +322,7 @@ function ToolCallBubble({ name, input }: ToolCallBubbleProps) {
           {name}
         </div>
         {isExpanded && input && (
-          <div 
+          <div
             className="mt-2 text-xs font-mono opacity-70 pt-2 border-t"
             style={{ borderColor: 'color-mix(in srgb, var(--border) 30%, transparent)' }}
           >
@@ -352,13 +352,13 @@ function SubagentBubble({ agent, content }: SubagentBubbleProps) {
     .join(' ');
 
   return (
-    <div 
+    <div
       className="flex gap-3 items-start cursor-pointer transition-all duration-200 hover:opacity-80"
       onClick={() => setIsExpanded(!isExpanded)}
     >
-      <div 
+      <div
         className="flex-1 rounded-xl px-4 py-3 shadow-sm backdrop-blur-sm border transition-all"
-        style={{ 
+        style={{
           backgroundColor: 'color-mix(in srgb, var(--bg-secondary) 60%, transparent)',
           borderColor: 'color-mix(in srgb, var(--border) 50%, transparent)',
         }}
@@ -367,7 +367,7 @@ function SubagentBubble({ agent, content }: SubagentBubbleProps) {
           {agentDisplayName}
         </div>
         {isExpanded && content && (
-          <div 
+          <div
             className="mt-2 text-sm opacity-90 pt-2 border-t whitespace-pre-wrap"
             style={{ borderColor: 'color-mix(in srgb, var(--border) 30%, transparent)' }}
           >
@@ -397,9 +397,9 @@ function formatParams(value: any): string {
       // Filter out tool_call_id and other internal metadata
       const filteredEntries = Object.entries(value)
         .filter(([k]) => k !== 'tool_call_id');
-      
+
       if (filteredEntries.length === 0) return '';
-      
+
       return filteredEntries
         .map(([k, v]) => `${k}: ${typeof v === 'object' ? JSON.stringify(v) : String(v)}`)
         .join(' · ');
@@ -434,7 +434,7 @@ function MessageBubble({ message }: MessageBubbleProps) {
     if (message.meta?.agent) {
       return <SubagentBubble agent={message.meta.agent} content={content?.text || JSON.stringify(content)} />;
     }
-    
+
     // Regular supervisor message
     return (
       <div className="flex gap-3 items-start">
@@ -461,4 +461,3 @@ function MessageBubble({ message }: MessageBubbleProps) {
     </div>
   );
 }
-

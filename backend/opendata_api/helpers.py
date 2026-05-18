@@ -1,7 +1,8 @@
-from .client import BolognaOpenData
-from typing import Any, Dict, List, Optional
-import re
 import html
+import re
+from typing import Any, Dict, List, Optional
+
+from .client import BolognaOpenData
 
 
 # --------------
@@ -58,7 +59,7 @@ def _shallow_truncate(
             for x in v[:keep]
         ]
         if n > keep:
-            head.append(f"… (+{n-keep} more)")
+            head.append(f"… (+{n - keep} more)")
         return head if isinstance(v, list) else tuple(head)
 
     # dicts: keep a few key/value pairs, shallowly truncated
@@ -70,7 +71,7 @@ def _shallow_truncate(
             for k, val in items[:keep]
         }
         if len(items) > keep:
-            kept["…"] = f"[+{len(items)-keep} more keys]"
+            kept["…"] = f"[+{len(items) - keep} more keys]"
         return kept
 
     # fallback: string repr capped
@@ -361,7 +362,9 @@ async def get_dataset_time_info(
 # estimate dataset size
 # ----------------
 async def is_dataset_too_heavy(
-    client: BolognaOpenData, dataset_id: str, threshold: int = 5_000_000  # 5MB
+    client: BolognaOpenData,
+    dataset_id: str,
+    threshold: int = 5_000_000,  # 5MB
 ) -> bool:
     """
     Estimate dataset size based on record count and field count.
@@ -390,7 +393,7 @@ async def is_dataset_too_heavy(
         estimated_size = total_records * len(fields) * 2
 
         print(
-            f"Dataset {dataset_id}: {total_records} records, {len(fields)} fields, estimated {estimated_size/ 1024 / 1024:.2f} MegaBytes"
+            f"Dataset {dataset_id}: {total_records} records, {len(fields)} fields, estimated {estimated_size / 1024 / 1024:.2f} MegaBytes"
         )
 
         return estimated_size > threshold

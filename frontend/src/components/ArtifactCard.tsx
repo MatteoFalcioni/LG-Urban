@@ -46,15 +46,15 @@ export function ArtifactCard({ artifact }: ArtifactCardProps) {
         {/* Images without frame, HTML and others with beige frame */}
         {isImage ? (
           /* Static plots with small beige frame */
-          <div 
+          <div
             className="rounded-xl overflow-hidden shadow-sm p-2 relative group"
             style={{ backgroundColor: 'var(--bg-secondary)' }}
           >
-            <img 
-              src={url} 
+            <img
+              src={url}
               alt={name}
               className="w-full object-contain rounded-lg"
-              style={{ 
+              style={{
                 maxHeight: '800px',
                 objectFit: 'contain'
               }}
@@ -70,7 +70,7 @@ export function ArtifactCard({ artifact }: ArtifactCardProps) {
           </div>
         ) : (
           /* HTML and other files with beige card */
-          <div 
+          <div
             className={`rounded-xl overflow-hidden shadow-sm relative group ${isHtml ? 'aspect-square' : 'h-24'}`}
             style={{ backgroundColor: 'var(--bg-secondary)', color: 'var(--text-primary)' }}
           >
@@ -110,7 +110,7 @@ export function ArtifactCard({ artifact }: ArtifactCardProps) {
             )}
           </div>
         )}
-        
+
         {/* Download button inline below - reduced spacing for images */}
         <div className={`flex justify-center ${isImage ? 'mt-2' : 'mt-3'}`}>
           <a
@@ -127,7 +127,7 @@ export function ArtifactCard({ artifact }: ArtifactCardProps) {
 
       {/* Fullscreen Modal */}
       {isFullscreen && canFullscreen && (
-        <div 
+        <div
           className="fixed inset-0 z-50 bg-black/95 flex items-center justify-center p-4"
           onClick={() => setIsFullscreen(false)}
         >
@@ -139,13 +139,13 @@ export function ArtifactCard({ artifact }: ArtifactCardProps) {
             <X size={24} className="text-white" />
           </button>
 
-          <div 
+          <div
             className="w-full h-full max-w-[95vw] max-h-[95vh] flex items-center justify-center"
             onClick={(e) => e.stopPropagation()}
           >
             {isImage ? (
-              <img 
-                src={url} 
+              <img
+                src={url}
                 alt={name}
                 className="max-w-full max-h-full object-contain"
               />
@@ -189,4 +189,3 @@ export function ArtifactGrid({ artifacts }: ArtifactGridProps) {
     </div>
   );
 }
-

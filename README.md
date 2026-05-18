@@ -146,8 +146,8 @@ Visit `http://localhost:5173` 🎉
   │          │ │    │   caching) │
   │          │ │    └────────────┘
   │ •App DB  │ │
-  │ •LG CKPTs│ │    
-  └──────────┘ │    
+  │ •LG CKPTs│ │
+  └──────────┘ │
                │
         ┌──────▼─────────┐
         │  Modal.com     │
@@ -218,6 +218,3 @@ npx tsc --noEmit  # Type checking
 npm run lint      # ESLint
 npm run build     # Production build
 ```
-
-
-
