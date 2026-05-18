@@ -157,6 +157,18 @@ async def execute_code_tool(
                 ]
             }
         )
+    except Exception as e:
+        logger.error(f"[TOOL] execute_code_tool: execution failed with error: {e}", exc_info=True)
+        return Command(
+            update={
+                "messages": [
+                    ToolMessage(
+                        content=f"Error: Code execution failed: {str(e)}",
+                        tool_call_id=runtime.tool_call_id,
+                    )
+                ]
+            }
+        )
 
     # take out artifacts from result and use artifact field of ToolMessage to return them
     artifacts = result.pop("artifacts")

@@ -901,6 +901,7 @@ async def post_message_stream(
 
     # Stream LangGraph agent response via SSE
     async def event_stream():
+        import time
         from backend.main import get_thread_lock
         from backend.graph.graph import make_graph
         from backend.main import _checkpointer_cm
@@ -916,6 +917,20 @@ async def post_message_stream(
         if not _checkpointer_cm:
             yield f"data: {json.dumps({'error': 'Checkpointer not initialized'})}\n\n"
             return
+        
+        # Track last activity for keepalive (prevents proxy timeout)
+        last_activity = [time.time()]  # Use list for mutable reference
+        
+        def update_activity():
+            """Update last activity timestamp"""
+            last_activity[0] = time.time()
+        
+        async def send_keepalive_if_needed():
+            """Send keepalive comment if no activity for 15 seconds"""
+            if time.time() - last_activity[0] > 15:
+                update_activity()
+                return ": keepalive\n\n"
+            return None
 
         # Wait for auto-titling to complete and emit event if successful
         try:
@@ -990,6 +1005,12 @@ async def post_message_stream(
                 last_known_agent_node = None
 
                 async for event in graph.astream_events(state, config, version="v2"):
+                    # Send keepalive if needed
+                    keepalive = await send_keepalive_if_needed()
+                    if keepalive:
+                        yield keepalive
+                    
+                    update_activity()  # Update on each event
                     event_type = event.get("event")
                     event_name = event.get("name", "")
                     event_meta = event.get("metadata", {})

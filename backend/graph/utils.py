@@ -31,7 +31,8 @@ def get_openrouter_model(
         api_key=api_key,
         base_url="https://openrouter.ai/api/v1",
         temperature=temperature,
-        stream_usage=stream_usage
+        stream_usage=stream_usage,
+        request_timeout=300  # 5 minutes for complex reasoning tasks
     )
 
     return model

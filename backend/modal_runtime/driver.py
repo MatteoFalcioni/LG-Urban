@@ -96,8 +96,8 @@ def driver_program():
             region_name=region,
             config=Config(
                 signature_version="s3v4",
-                connect_timeout=5,
-                read_timeout=10
+                connect_timeout=10,
+                read_timeout=30
             )
         )
         s3_bucket = os.getenv("S3_BUCKET", "lg-urban-prod")

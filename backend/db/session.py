@@ -25,8 +25,8 @@ ENGINE = create_async_engine(
     future=True,
     pool_pre_ping=True,
     pool_size=20,           # Number of connections to maintain
-    max_overflow=20,        # Extra connections if needed
-    pool_timeout=30,       # Seconds to wait for a connection
+    max_overflow=40,        # Increased for production SSE streaming
+    pool_timeout=60,       # Increased timeout for connection acquisition
     pool_recycle=3600,     # Recreate connections after 1 hour
     echo_pool=True,        # Log pool checkouts/checkins for debugging
 )

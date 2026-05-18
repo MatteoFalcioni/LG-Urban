@@ -52,7 +52,7 @@ class SandboxExecutor:
             app=hydrated_app,
             image=image,
             timeout=60 * 60 * 2,  # 2 hours session timeout
-            idle_timeout=60 * 10,  # 10 min idle timeout
+            idle_timeout=60 * 20,  # 20 min idle timeout (increased for long LLM reasoning)
             volumes={"/workspace": self.volume},  # link it to above volume
             workdir=base_dir,  # NEW: per session cwd
             secrets=secrets,  # AWS creds for S3 uploads (optional)
