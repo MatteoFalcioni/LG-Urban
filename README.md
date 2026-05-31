@@ -21,6 +21,14 @@ Check out the full evaluation framework and results:
 
 ---
 
+**UrbIA's architecture:**
+
+<div align=center>
+    <img src="urbia.jpg" width="700", alt="urbia's architecture">
+</div>
+
+---
+
 ## 🎯 Core Features
 
 ### 💬 Intelligent Conversations
