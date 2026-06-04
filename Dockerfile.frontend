@@ -1,11 +1,14 @@
+# syntax=docker/dockerfile:1
+# check=skip=SecretsUsedInArgOrEnv
 # Dockerfile.frontend
 # Frontend React app with Vite
 
-FROM node:18-alpine as builder
+FROM node:20-alpine AS builder
 
 WORKDIR /app
 
-# Accept build arguments
+# Accept build arguments. Vite embeds VITE_* values into the static bundle.
+# Clerk publishable keys are intentionally browser-visible.
 ARG VITE_API_URL
 ARG VITE_CLERK_PUBLISHABLE_KEY
 ENV VITE_API_URL=$VITE_API_URL
@@ -39,7 +42,7 @@ COPY frontend/nginx.conf /etc/nginx/conf.d/default.conf.template
 COPY frontend/docker-entrypoint.sh /docker-entrypoint.sh
 RUN chmod +x /docker-entrypoint.sh
 
-# Railway provides PORT env var
-ENV PORT=80
+# Railway injects PORT at runtime. The entrypoint falls back to 8080 for local runs.
+EXPOSE 8080
 
 ENTRYPOINT ["/docker-entrypoint.sh"]
