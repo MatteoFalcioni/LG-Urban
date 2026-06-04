@@ -114,7 +114,7 @@ services:
     depends_on:
       - backend
     ports:
-      - "80:80"
+      - "80:8080"
     networks:
       - langgraph-network
     restart: unless-stopped
