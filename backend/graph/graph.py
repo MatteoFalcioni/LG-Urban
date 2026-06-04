@@ -94,8 +94,8 @@ def make_graph(
     Create a graph with custom config. Reuses the same checkpointer for all invocations.
 
     Args:
-        model_name: Model name (e.g., "gpt-4.1", "claude-sonnet-4-5").
-                    Automatically converted to OpenRouter format (openai/gpt-4.1, anthropic/claude-sonnet-4-5).
+        model_name: Model name (e.g., "gpt-5.1", "claude-sonnet-4-5").
+                    Automatically converted to OpenRouter format (openai/gpt-5.1, anthropic/claude-sonnet-4-5).
         temperature: Model temperature (0.0-2.0). If None, uses env DEFAULT_TEMPERATURE or model default.
         system_prompt: Custom system prompt. If None, uses default PROMPT.
         context_window: Custom context window. If None, uses env CONTEXT_WINDOW.
@@ -113,9 +113,9 @@ def make_graph(
         openrouter_api_key = SecretStr(os.getenv("OPENROUTER_API_KEY"))
 
     # ======= SUPERVISOR =======
-    # use gpt-4.1 for supervisor (via OpenRouter)
+    # use gpt-5.1 for supervisor (via OpenRouter)
     supervisor_llm = get_openrouter_model(
-        model_name="openai/gpt-4.1", api_key=openrouter_api_key
+        model_name="openai/gpt-5.1", api_key=openrouter_api_key
     )
 
     supervisor_agent = create_agent(
@@ -137,18 +137,16 @@ def make_graph(
         f"[MODEL] Using model: {model_name} (temperature: {temp if temp is not None else DEFAULT_TEMPERATURE}), context window: {context_window if context_window is not None else CONTEXT_WINDOW}"
     )
 
-    # Convert model name to OpenRouter format if needed
-    # OpenRouter expects format: "provider/model-name"
+    # Convert short model names to OpenRouter provider/model format
     if model_name.startswith("gpt-"):
         openrouter_model_name = f"openai/{model_name}"
     elif model_name.startswith("claude-"):
         openrouter_model_name = f"anthropic/{model_name}"
     elif model_name.startswith("kimi-"):
-        openrouter_model_name = f"moonshot/{model_name}"
+        openrouter_model_name = f"moonshotai/{model_name}"
     elif model_name.startswith("minimax-"):
         openrouter_model_name = f"minimax/{model_name}"
     else:
-        # Assume it's already in OpenRouter format or a valid model name
         openrouter_model_name = model_name
 
     # Create analyst LLM via OpenRouter
@@ -193,7 +191,7 @@ def make_graph(
 
     # Summarizer for middleware (via OpenRouter)
     summarizer = get_openrouter_model(
-        model_name="openai/gpt-4.1", api_key=openrouter_api_key
+        model_name="openai/gpt-5.1", api_key=openrouter_api_key
     )
 
     analyst_agent = create_agent(
@@ -217,9 +215,9 @@ def make_graph(
     )
 
     # ======= REPORT WRITER AGENT =======
-    # use gpt 4.1 for report writer (via OpenRouter)
+    # use gpt-5.1 for report writer (via OpenRouter)
     report_writer_llm = get_openrouter_model(
-        model_name="openai/gpt-4.1", api_key=openrouter_api_key
+        model_name="openai/gpt-5.1", api_key=openrouter_api_key
     )
 
     agent_report_writer = create_agent(
@@ -239,9 +237,9 @@ def make_graph(
     )
 
     # ======= REVIEWER AGENT =======
-    # use gpt-4.1 for reviewer (via OpenRouter)
+    # use gpt-5.1 for reviewer (via OpenRouter)
     reviewer_llm = get_openrouter_model(
-        model_name="openai/gpt-4.1", api_key=openrouter_api_key
+        model_name="openai/gpt-5.1", api_key=openrouter_api_key
     )
     agent_reviewer = create_agent(
         model=reviewer_llm,

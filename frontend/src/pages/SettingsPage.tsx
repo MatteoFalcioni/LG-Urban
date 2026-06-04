@@ -238,7 +238,7 @@ export function SettingsPage() {
               >
                 <option value="gpt-5.5">GPT-5.5</option>
                 <option value="kimi-k2.6">Kimi k2.6</option>
-                <option value="minimax-m2.5">MiniMax M2.5</option>
+                <option value="minimax-m2.7">MiniMax M2.7</option>
                 <option value="claude-sonnet-4.6">Claude Sonnet 4.6</option>
                 <option value="claude-opus-4.6">Claude Opus 4.6</option>
               </select>

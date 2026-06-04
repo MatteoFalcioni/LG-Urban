@@ -11,7 +11,7 @@ import { useChatStore } from '@/store/chatStore';
 const MODELS = [
   { value: 'gpt-5.5', label: 'GPT-5.5' },
   { value: 'kimi-k2.6', label: 'Kimi k2.6' },
-  { value: 'minimax-m2.5', label: 'MiniMax M2.5' },
+  { value: 'minimax-m2.7', label: 'MiniMax M2.7' },
   { value: 'claude-sonnet-4.6', label: 'Claude Sonnet 4.6' },
   { value: 'claude-opus-4.6', label: 'Claude Opus 4.6' },
 ] as const;

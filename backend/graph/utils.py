@@ -28,6 +28,15 @@ def get_openrouter_model(
     elif isinstance(api_key, str):
         api_key = SecretStr(api_key)
 
+    provider, _, provider_model_name = model_name.partition("/")
+    if not provider_model_name:
+        provider_model_name = provider
+
+    extra_body = None
+    is_openai_model = provider == "openai" or "/" not in model_name
+    if is_openai_model and provider_model_name.startswith("gpt-5.1"):
+        extra_body = {"reasoning": {"effort": "none", "summary": "concise"}}
+
     model = ChatOpenAI(
         model=model_name,
         api_key=api_key,
@@ -35,6 +44,7 @@ def get_openrouter_model(
         temperature=temperature,
         stream_usage=stream_usage,
         request_timeout=300,  # 5 minutes for complex reasoning tasks
+        extra_body=extra_body,
     )
 
     return model
